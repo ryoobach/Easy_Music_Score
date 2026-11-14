@@ -51,7 +51,7 @@ public partial class MainWindow : Window
         var dialog = new OpenFileDialog
         {
             Title = "음악 파일 선택",
-            Filter = "음악 파일|*.mp3;*.wav;*.m4a;*.flac;*.aac;*.wma|모든 파일|*.*",
+            Filter = "MP3 음악 파일 (*.mp3)|*.mp3",
             CheckFileExists = true
         };
         if (dialog.ShowDialog(this) == true)
