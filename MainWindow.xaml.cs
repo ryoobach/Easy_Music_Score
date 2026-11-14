@@ -1,10 +1,12 @@
+using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -14,12 +16,13 @@ namespace EasyMusicScore;
 
 public partial class MainWindow : Window
 {
-    private const string Placeholder = "방송 주소를 입력하세요";
+    private const string Placeholder = "곡 제목·가수 이름을 입력하거나 MP3 파일을 선택하세요";
     private readonly string _settingsDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EasyMusicScore");
     private string SettingsPath => Path.Combine(_settingsDirectory, "settings.json");
     private AppSettings _settings = new();
     private bool _placeholderVisible = true;
     private bool _hasPrintableScore = false;
+    private bool _searchBrowserInitialized = false;
 
     public MainWindow()
     {
@@ -38,7 +41,7 @@ public partial class MainWindow : Window
             SourceComboBox.Text = _settings.LastInput;
             SourceComboBox.Foreground = new SolidColorBrush(Color.FromRgb(32, 41, 56));
             _placeholderVisible = false;
-            StatusText.Text = "이전 실행의 입력 기록을 불러왔습니다.";
+            StatusText.Text = "이전 검색어나 파일 경로를 불러왔습니다.";
         }
         else ShowPlaceholder();
     }
@@ -122,26 +125,22 @@ public partial class MainWindow : Window
             _settings.LastFile = dialog.FileName;
             _settings.LastFolder = Path.GetDirectoryName(dialog.FileName) ?? string.Empty;
             SaveSettings();
-            StatusText.Text = "MP3 파일을 선택했습니다. 확인을 눌러 주세요.";
+            StatusText.Text = "MP3 파일을 선택했습니다. 검색 버튼을 눌러 주세요.";
         }
     }
 
-    private void Confirm_Click(object sender, RoutedEventArgs e)
+    private async void Confirm_Click(object sender, RoutedEventArgs e)
     {
-        // Read the live editor text before focus changes can replace it with the placeholder.
         SourceComboBox.ApplyTemplate();
         var inputEditor = SourceComboBox.Template.FindName("PART_EditableTextBox", SourceComboBox) as TextBox;
         var enteredText = inputEditor?.Text ?? SourceComboBox.Text;
         var value = _placeholderVisible ? string.Empty : enteredText.Trim();
         if (string.IsNullOrWhiteSpace(value) || value == Placeholder)
         {
-            StatusText.Text = "방송 주소를 입력하거나 MP3 파일을 선택해 주세요.";
+            StatusText.Text = "곡 제목·가수 이름을 입력하거나 MP3 파일을 선택해 주세요.";
             return;
         }
 
-        StatusText.Text = "입력한 내용을 확인하고 있습니다...";
-        NoticeTitleText.Text = "입력 내용을 확인하고 있습니다.";
-        NoticeReasonText.Text = "선택한 파일인지 방송 주소인지 확인하는 중입니다.";
         _settings.LastInput = value;
         _settings.InputHistory.RemoveAll(x => string.Equals(x, value, StringComparison.OrdinalIgnoreCase));
         _settings.InputHistory.Insert(0, value);
@@ -156,164 +155,92 @@ public partial class MainWindow : Window
         SongTitleText.Text = string.Empty;
         SongCreditsText.Text = string.Empty;
 
-        if (File.Exists(value))
+        if (File.Exists(value) && !string.Equals(Path.GetExtension(value), ".mp3", StringComparison.OrdinalIgnoreCase))
         {
-            if (!string.Equals(Path.GetExtension(value), ".mp3", StringComparison.OrdinalIgnoreCase))
-            {
-                NoticeTitleText.Text = "MP3 파일을 선택해 주세요.";
-                NoticeReasonText.Text = "현재 버전에서는 MP3 파일의 곡 정보 분석을 지원합니다.";
-                StatusText.Text = "지원하지 않는 파일 형식입니다.";
-                return;
-            }
-
-            _settings.LastFile = value;
-            _settings.LastFolder = Path.GetDirectoryName(value) ?? _settings.LastFolder;
-            SaveSettings();
-            AnalyzeMp3Metadata(value);
+            NoticeTitleText.Text = "MP3 파일을 선택해 주세요.";
+            NoticeReasonText.Text = "현재 검색 단계에서는 MP3 파일 또는 곡 검색어를 사용할 수 있습니다.";
+            StatusText.Text = "지원하지 않는 파일 형식입니다.";
+            SearchWebView.Visibility = Visibility.Collapsed;
+            EmptyScorePanel.Visibility = Visibility.Visible;
             return;
         }
 
-        NoticeTitleText.Text = "방송 분석 기능 준비 중";
-        NoticeReasonText.Text = "인터넷 방송의 곡 식별 기능은 아직 연결되지 않았습니다. 이번 버전에서는 컴퓨터에 저장된 MP3 파일의 곡 정보를 먼저 확인합니다.";
-        StatusText.Text = "방송 주소를 기억했습니다. 방송 곡 식별 기능은 후속 버전에서 제공됩니다.";
+        if (!File.Exists(value) && Uri.TryCreate(value, UriKind.Absolute, out var enteredUri) &&
+            (enteredUri.Scheme == Uri.UriSchemeHttp || enteredUri.Scheme == Uri.UriSchemeHttps))
+        {
+            NoticeTitleText.Text = "인터넷 방송 분석은 아직 준비 중입니다.";
+            NoticeReasonText.Text = "이번 단계에서는 MP3 파일 또는 곡 제목·가수 이름으로 악보 이미지를 검색합니다.";
+            StatusText.Text = "방송 주소 입력은 후속 단계에서 연결합니다.";
+            SearchWebView.Visibility = Visibility.Collapsed;
+            EmptyScorePanel.Visibility = Visibility.Visible;
+            return;
+        }
+
+        // 파일 선택 시 경로 전체를 검색어로 전달합니다. 직접 입력한 문장도 그대로 사용합니다.
+        await SearchNaverImagesAsync(value);
     }
 
-    private async void AnalyzeMp3Metadata(string path)
+    private async Task SearchNaverImagesAsync(string originalInput)
     {
-        string tagTitle = string.Empty;
-        string tagArtist = string.Empty;
+        var query = originalInput.Trim();
+        var searchText = query + " 악보";
+        var searchUrl = "https://search.naver.com/search.naver?where=image&sm=tab_jum&query=" +
+                        Uri.EscapeDataString(searchText);
+
+        NoticeTitleText.Text = "네이버 이미지 검색 결과를 불러오고 있습니다.";
+        NoticeReasonText.Text = "입력한 파일 경로 또는 검색어를 그대로 사용해 악보 이미지를 검색합니다.";
+        StatusText.Text = "네이버 이미지 검색 중...";
+        SearchWebView.Visibility = Visibility.Visible;
+        EmptyScorePanel.Visibility = Visibility.Collapsed;
+        SongTitleText.Text = "네이버 이미지 검색 결과";
+        SongCreditsText.Text = "검색어: " + query;
 
         try
         {
-            using var media = TagLib.File.Create(path);
-            tagTitle = media.Tag.Title?.Trim() ?? string.Empty;
-            tagArtist = media.Tag.Performers?.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))?.Trim() ?? string.Empty;
-        }
-        catch
-        {
-            // 태그가 없거나 손상되어도 파일 이름과 무료 공개 음악정보를 확인합니다.
-        }
-
-        var fileNameInfo = ParseFileName(Path.GetFileNameWithoutExtension(path));
-        string title = tagTitle;
-        string artist = tagArtist;
-        bool confirmedByPublicDatabase = false;
-
-        // 파일 이름이 제목 하나로만 되어 있으면 그 값을 제목 후보로 사용합니다.
-        if (string.IsNullOrWhiteSpace(title) && !fileNameInfo.HasTwoParts &&
-            fileNameInfo.Candidates.Count > 0)
-            title = fileNameInfo.Candidates[0].Title;
-
-        if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(artist))
-        {
-            NoticeTitleText.Text = "곡 정보를 확인하고 있습니다.";
-            NoticeReasonText.Text = "파일 이름의 앞뒤를 모두 살펴보고, 무료 음악 정보 자료와 대조하고 있습니다.";
-            StatusText.Text = "무료 음악 정보 확인 중...";
-            var match = await MusicBrainzLookup.FindAsync(fileNameInfo.Candidates);
-            if (match.HasValue)
+            if (!_searchBrowserInitialized)
             {
-                if (string.IsNullOrWhiteSpace(title)) title = match.Value.Title;
-                if (string.IsNullOrWhiteSpace(artist)) artist = match.Value.Artist;
-                confirmedByPublicDatabase = true;
-            }
-        }
-
-        // 제목은 있지만 가수를 알 수 없으면 제목만으로 공개 음악정보를 검색해
-        // 실제로 등록된 가수 후보를 사용자에게 보여줍니다.
-        if (!string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(artist))
-        {
-            NoticeTitleText.Text = "이 제목으로 등록된 가수를 찾고 있습니다.";
-            NoticeReasonText.Text = "제목이 같은 다른 노래일 수 있으므로 가수 후보를 확인해 주세요.";
-            StatusText.Text = "가수 후보 검색 중...";
-            var artistCandidates = await MusicBrainzLookup.FindArtistsAsync(title);
-            if (artistCandidates.Count > 0)
-            {
-                var picker = new ArtistSelectionWindow(title, artistCandidates) { Owner = this };
-                if (picker.ShowDialog() == true && !string.IsNullOrWhiteSpace(picker.SelectedArtist))
+                await SearchWebView.EnsureCoreWebView2Async();
+                SearchWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
+                SearchWebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+                SearchWebView.CoreWebView2.Settings.AreDevToolsEnabled = false;
+                SearchWebView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
+                SearchWebView.NavigationCompleted += (_, args) =>
                 {
-                    artist = picker.SelectedArtist;
-                    confirmedByPublicDatabase = true;
-                }
+                    StatusText.Text = args.IsSuccess
+                        ? "네이버 이미지 검색 결과를 표시했습니다. 악보 이미지를 선택해 원본을 확인하세요."
+                        : "검색 페이지를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.";
+                };
+                _searchBrowserInitialized = true;
             }
-        }
 
-        if (string.IsNullOrWhiteSpace(title))
-        {
-            NoticeTitleText.Text = "곡 제목을 확인하지 못했습니다.";
-            NoticeReasonText.Text = "파일 이름에서 제목을 확실하게 구분하지 못했습니다. 잘못된 정보를 정답처럼 표시하지 않았습니다.";
-            StatusText.Text = "곡 제목을 확인하지 못했습니다.";
-            return;
+            SearchWebView.CoreWebView2.Navigate(searchUrl);
         }
+        catch (Exception ex)
+        {
+            SearchWebView.Visibility = Visibility.Collapsed;
+            EmptyScorePanel.Visibility = Visibility.Visible;
+            NoticeTitleText.Text = "앱 안에서 검색 화면을 열지 못했습니다.";
+            NoticeReasonText.Text = "WebView2 실행 환경이 없거나 초기화에 실패했습니다. 기본 브라우저로 검색 페이지를 엽니다.";
+            StatusText.Text = "외부 브라우저에서 네이버 이미지 검색을 엽니다.";
 
-        SongTitleText.Text = title;
-        SongCreditsText.Text = string.IsNullOrWhiteSpace(artist) ? "가수 정보 확인 필요" : artist;
-
-        if (confirmedByPublicDatabase)
-        {
-            NoticeTitleText.Text = "곡 정보를 무료 자료에서 확인했습니다.";
-            NoticeReasonText.Text = "공개 음악 정보 자료에서 제목과 가수의 조합을 확인했습니다. 아직 악보 자체를 찾은 것은 아닙니다.";
-            StatusText.Text = $"곡 정보 확인: {artist} - {title}";
-        }
-        else if (!string.IsNullOrWhiteSpace(tagTitle) || !string.IsNullOrWhiteSpace(tagArtist))
-        {
-            NoticeTitleText.Text = "MP3에 저장된 곡 정보를 읽었습니다.";
-            NoticeReasonText.Text = "파일에 저장된 정보를 표시했습니다. 공개 자료에서 제목과 가수의 조합은 확인하지 못했습니다.";
-            StatusText.Text = "MP3 저장 정보 확인 완료";
-        }
-        else if (fileNameInfo.HasTwoParts)
-        {
-            NoticeTitleText.Text = "제목과 가수를 확실히 구분하지 못했습니다.";
-            NoticeReasonText.Text = "파일 이름의 앞부분과 뒷부분을 모두 확인했지만 무료 자료에서 일치하는 곡을 찾지 못했습니다. 추측한 정보를 정답처럼 표시하지 않았습니다.";
-            StatusText.Text = "곡 정보 확인이 필요합니다.";
-        }
-        else
-        {
-            NoticeTitleText.Text = "파일 이름에서 곡 제목 후보를 읽었습니다.";
-            NoticeReasonText.Text = "가수 정보는 확인되지 않았습니다. 파일 이름만으로 확실하지 않은 정보는 추측하지 않았습니다.";
-            StatusText.Text = $"곡 제목 후보: {title}";
+            try
+            {
+                Process.Start(new ProcessStartInfo(searchUrl) { UseShellExecute = true });
+            }
+            catch
+            {
+                StatusText.Text = "검색 화면을 열지 못했습니다: " + ex.Message;
+                NoticeReasonText.Text = ex.Message;
+            }
         }
     }
 
-    private static (List<(string Title, string Artist)> Candidates, bool HasTwoParts) ParseFileName(string fileName)
+    private void CoreWebView2_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
     {
-        var cleaned = fileName.Trim();
-        var separator = Regex.Match(cleaned, @"\s*[-–—_]\s*");
-        if (!separator.Success)
-            return (new List<(string, string)> { (cleaned, string.Empty) }, false);
-
-        var left = cleaned[..separator.Index].Trim();
-        var right = cleaned[(separator.Index + separator.Length)..].Trim();
-        var candidates = new List<(string Title, string Artist)>();
-
-        void AddCandidate(string possibleTitle, string possibleArtist)
-        {
-            possibleTitle = possibleTitle.Trim();
-            possibleArtist = possibleArtist.Trim();
-            if (string.IsNullOrWhiteSpace(possibleTitle) || string.IsNullOrWhiteSpace(possibleArtist)) return;
-            if (!candidates.Any(x => string.Equals(x.Title, possibleTitle, StringComparison.OrdinalIgnoreCase) &&
-                                     string.Equals(x.Artist, possibleArtist, StringComparison.OrdinalIgnoreCase)))
-                candidates.Add((possibleTitle, possibleArtist));
-        }
-
-        // '가수 - 제목'인지 '제목 - 가수'인지 미리 단정하지 않습니다.
-        AddCandidate(left, right);
-        AddCandidate(right, left);
-
-        // 숫자는 제목의 일부일 수 있으므로 원본을 보존하고, 트랙 번호를 뺀 후보도 별도로 확인합니다.
-        var leftWithoutTrackNumber = Regex.Replace(left, @"^\s*\d{1,3}[\s._]+", string.Empty).Trim();
-        var rightWithoutTrackNumber = Regex.Replace(right, @"^\s*\d{1,3}[\s._]+", string.Empty).Trim();
-        if (!string.Equals(left, leftWithoutTrackNumber, StringComparison.Ordinal))
-        {
-            AddCandidate(leftWithoutTrackNumber, right);
-            AddCandidate(right, leftWithoutTrackNumber);
-        }
-        if (!string.Equals(right, rightWithoutTrackNumber, StringComparison.Ordinal))
-        {
-            AddCandidate(left, rightWithoutTrackNumber);
-            AddCandidate(rightWithoutTrackNumber, left);
-        }
-
-        return (candidates, true);
+        e.Handled = true;
+        if (Uri.TryCreate(e.Uri, UriKind.Absolute, out var target) &&
+            (target.Scheme == Uri.UriSchemeHttp || target.Scheme == Uri.UriSchemeHttps))
+            SearchWebView.CoreWebView2.Navigate(target.ToString());
     }
 
     private void Print_Click(object sender, RoutedEventArgs e)
@@ -321,7 +248,7 @@ public partial class MainWindow : Window
         if (!_hasPrintableScore)
         {
             MessageBox.Show(this,
-                "인쇄할 악보가 아직 없습니다. 실제 악보가 화면에 표시된 후 인쇄해 주세요.",
+                "현재는 네이버 이미지 검색 결과를 표시하는 단계입니다. 악보 파일을 직접 가져와 인쇄하는 기능은 다음 단계에서 연결합니다.",
                 "Easy Music Score", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }

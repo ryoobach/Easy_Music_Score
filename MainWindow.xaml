@@ -1,6 +1,7 @@
 <Window x:Class="EasyMusicScore.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="Easy Music Score" Icon="/Assets/EasyMusicScore.png" Width="1180" Height="780"
         MinWidth="900" MinHeight="620" WindowStyle="None"
         Background="#F3F5F9" ResizeMode="CanResize"
@@ -28,6 +29,7 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="22,0,0,0">
                     <Image Source="/Assets/EasyMusicScore.png" Width="28" Height="28" Stretch="Uniform" Margin="0,0,10,0"/>
                     <TextBlock Text="Easy Music Score" FontSize="17" FontWeight="SemiBold" Foreground="#202938" VerticalAlignment="Center"/>
+                    <TextBlock Text="v1.09" FontSize="11" Foreground="#8994A5" VerticalAlignment="Center" Margin="9,4,0,0"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <Button Style="{StaticResource WindowButton}" Content="—" Click="Minimize_Click"/>
@@ -44,7 +46,7 @@
                                   BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center" Padding="12,0,8,0"
                                   FontSize="15" Foreground="#202938" GotFocus="SourceComboBox_GotFocus" LostFocus="SourceComboBox_LostFocus"
                                   KeyDown="SourceComboBox_KeyDown" SelectionChanged="SourceComboBox_SelectionChanged"
-                                  ToolTip="방송 주소를 입력하거나 이전 주소를 선택하세요"/>
+                                  ToolTip="곡 제목·가수 이름을 입력하거나 MP3 파일을 선택하세요"/>
                         <Button Grid.Column="1" Background="Transparent" BorderThickness="0" Cursor="Hand" ToolTip="MP3 파일 찾아보기" Click="Browse_Click">
                             <Viewbox Width="25" Height="25"><Canvas Width="32" Height="32">
                                 <Path Data="M3,8 L3,6 C3,4.9 3.9,4 5,4 L12,4 L15,7 L27,7 C28.1,7 29,7.9 29,9 L29,24 C29,25.1 28.1,26 27,26 L5,26 C3.9,26 3,25.1 3,24 Z" Stroke="#526783" StrokeThickness="1.9" Fill="#EEF3FA" StrokeLineJoin="Round"/>
@@ -54,10 +56,10 @@
                         </Button>
                     </Grid>
                 </Border>
-                <Button Grid.Column="1" Style="{StaticResource ActionButton}" Margin="12,0,0,0" Content="확인" Click="Confirm_Click"/>
+                <Button Grid.Column="1" Style="{StaticResource ActionButton}" Margin="12,0,0,0" Content="검색" Click="Confirm_Click"/>
                 <Button Grid.Column="2" Width="52" Height="44" Margin="10,0,0,0" Background="White" BorderBrush="#D9E0EA" BorderThickness="1" ToolTip="악보 인쇄" Cursor="Hand" Click="Print_Click">
                     <Viewbox Width="25" Height="25"><Canvas Width="32" Height="32">
-                        <Path Data="M9,11 L9,4 L23,4 L23,11 M9,23 L5,23 C3.9,23 3,22.1 3,21 L3,14 C3,12.9 3.9,12 5,12 L27,12 C28.1,12 29,12.9 29,14 L29,21 C29,22.1 28.1,23 27,23 L23,23" Stroke="#3769D6" StrokeThickness="2" Fill="Transparent" StrokeLineJoin="Round"/>
+                        <Path Data="M9,11 L9,4 L23,4 L23,11 M9,23 L5,23 C3.9,23 3,22.1 3,21 L3,14 C3,12.9 3.9,12 5,12 L27,12 C28.1 12 29,12.9 29,14 L29,21 C29,22.1 28.1,23 27,23 L23,23" Stroke="#3769D6" StrokeThickness="2" Fill="Transparent" StrokeLineJoin="Round"/>
                         <Path Data="M9,19 L23,19 L23,28 L9,28 Z" Stroke="#3769D6" StrokeThickness="2" Fill="#EEF3FF"/>
                         <Path Data="M24,15 L26,15" Stroke="#3769D6" StrokeThickness="2"/>
                     </Canvas></Viewbox>
@@ -66,21 +68,22 @@
             <Border x:Name="ScoreSurface" Grid.Row="2" Margin="28,0,28,18" Background="White" CornerRadius="12" BorderBrush="#E1E6EE" BorderThickness="1">
                 <Grid>
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                    <StackPanel Grid.Row="0" Margin="32,28,32,22">
-                        <TextBlock x:Name="SongTitleText" Text="" FontSize="27" FontWeight="Bold" Foreground="#202938" HorizontalAlignment="Center"/>
-                        <TextBlock x:Name="SongCreditsText" Text="" FontSize="13" Foreground="#778397" HorizontalAlignment="Center" Margin="0,9,0,0"/>
+                    <StackPanel Grid.Row="0" Margin="32,20,32,14">
+                        <TextBlock x:Name="SongTitleText" Text="" FontSize="25" FontWeight="Bold" Foreground="#202938" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="SongCreditsText" Text="" FontSize="12" Foreground="#778397" HorizontalAlignment="Center" Margin="0,7,0,0" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <Grid Grid.Row="1">
+                        <wv2:WebView2 x:Name="SearchWebView" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                         <StackPanel x:Name="EmptyScorePanel" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="30,24">
-                            <TextBlock x:Name="NoticeTitleText" Text="음원을 선택해 주세요." FontSize="24" FontWeight="Bold" Foreground="#8792A4" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,10"/>
+                            <TextBlock x:Name="NoticeTitleText" Text="음원을 선택하거나 검색어를 입력해 주세요." FontSize="24" FontWeight="Bold" Foreground="#8792A4" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,10"/>
                             <TextBlock x:Name="NoticeReasonText" Text="" FontSize="14" Foreground="#778397" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,24"/>
                             <TextBlock Text="Easy Music Score 사용 방법" FontSize="16" FontWeight="SemiBold" Foreground="#35445B" HorizontalAlignment="Center" Margin="0,0,0,12"/>
-                            <TextBlock Text="1. 인터넷 방송 주소를 입력하거나 MP3 파일을 선택합니다.&#10;2. 확인 버튼을 누릅니다.&#10;3. 음원을 재생하지 않고 곡 정보를 분석한 뒤 악보를 검색합니다.&#10;4. 검색된 악보는 이 영역에 표시됩니다.&#10;5. 인쇄 버튼으로 A4 용지에 출력할 수 있습니다.&#10;6. 파일 이름이 가수 이름과 노래 제목으로 정확하게 되어 있으면 악보를 더 쉽게 찾을 수 있습니다."
+                            <TextBlock Text="1. MP3 파일을 선택하거나 곡 제목·가수 이름을 입력합니다.&#10;2. 검색 버튼을 누릅니다.&#10;3. 네이버 이미지 검색 결과가 이 영역에 표시됩니다.&#10;4. 악보 이미지를 선택해 원본 페이지와 악보 정보를 확인합니다.&#10;5. 파일 경로를 선택해도 되고, 검색어를 직접 입력해도 됩니다."
                                        FontSize="14" LineHeight="27" Foreground="#68768B" TextAlignment="Left" HorizontalAlignment="Center"/>
-                            <TextBlock Text="※ 음원은 분석만 하며 스피커나 이어폰으로 재생되지 않습니다." FontSize="12" Foreground="#8A96A8" Margin="0,18,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
+                            <TextBlock Text="※ 현재 단계는 네이버 이미지 검색 결과를 표시합니다. 악보 파일 변환·인쇄 기능은 다음 단계에서 연결합니다." FontSize="12" Foreground="#8A96A8" Margin="0,18,0,0" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
                         </StackPanel>
-                    </ScrollViewer>
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,22">
+                    </Grid>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,18">
                         <Image Source="/Assets/EasyMusicScore.png" Width="18" Height="18" Stretch="Uniform" Margin="0,0,7,0"/>
                         <TextBlock Text="Ryoo Jaesang &amp; 최피디" FontSize="13" Foreground="#778397" VerticalAlignment="Center"/>
                     </StackPanel>
