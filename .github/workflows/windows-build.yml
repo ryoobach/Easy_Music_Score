@@ -16,6 +16,30 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+      - name: Create shared application icon
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path Assets | Out-Null
+          Add-Type -AssemblyName System.Drawing
+          $bmp = New-Object System.Drawing.Bitmap 256,256
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+          $g.Clear([System.Drawing.Color]::FromArgb(13,25,48))
+          $orange = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255,145,55))
+          $teal = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(53,210,190))
+          $purple = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(174,115,255))
+          $penO = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(255,145,55),12)
+          $penT = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(53,210,190),12)
+          $penP = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(174,115,255),12)
+          $g.DrawLine($penO,82,58,82,153); $g.FillEllipse($orange,42,143,52,39)
+          $g.DrawLine($penT,148,44,148,132); $g.FillEllipse($teal,108,122,52,39)
+          $g.DrawLine($penP,202,66,202,151); $g.FillEllipse($purple,162,140,52,39)
+          $g.FillPolygon($orange,@([System.Drawing.Point]::new(82,58),[System.Drawing.Point]::new(148,44),[System.Drawing.Point]::new(148,59),[System.Drawing.Point]::new(82,74)))
+          $g.FillPolygon($teal,@([System.Drawing.Point]::new(148,44),[System.Drawing.Point]::new(202,66),[System.Drawing.Point]::new(202,81),[System.Drawing.Point]::new(148,59)))
+          $ms = New-Object System.IO.MemoryStream; $bmp.Save($ms,[System.Drawing.Imaging.ImageFormat]::Png); $png=$ms.ToArray()
+          $fs=[System.IO.File]::Create('Assets/EasyMusicScore.ico'); $bw=New-Object System.IO.BinaryWriter($fs)
+          $bw.Write([UInt16]0); $bw.Write([UInt16]1); $bw.Write([UInt16]1); $bw.Write([Byte]0); $bw.Write([Byte]0); $bw.Write([Byte]0); $bw.Write([Byte]0); $bw.Write([UInt16]1); $bw.Write([UInt16]32); $bw.Write([UInt32]$png.Length); $bw.Write([UInt32]22); $bw.Write($png); $bw.Close(); $fs.Close()
+          $g.Dispose(); $bmp.Dispose(); $ms.Dispose()
       - name: Publish self-contained Windows app
         run: dotnet publish EasyMusicScore.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
       - name: Package runnable application
@@ -23,11 +47,11 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path release | Out-Null
           Copy-Item publish\* release\ -Recurse -Force
-          Compress-Archive -Path release\* -DestinationPath EasyMusicScore-Windows-x64.zip -Force
+          Compress-Archive -Path release\* -DestinationPath EasyMusicScore_v1.02-Windows-x64.zip -Force
       - name: Upload Windows ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: EasyMusicScore-Windows-x64
-          path: EasyMusicScore-Windows-x64.zip
+          name: EasyMusicScore_v1.02-Windows-x64
+          path: EasyMusicScore_v1.02-Windows-x64.zip
           if-no-files-found: error
           retention-days: 14
