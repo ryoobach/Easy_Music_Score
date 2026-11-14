@@ -137,7 +137,7 @@ public partial class MainWindow : Window
         var value = _placeholderVisible ? string.Empty : enteredText.Trim();
         if (string.IsNullOrWhiteSpace(value) || value == Placeholder)
         {
-            StatusText.Text = "곡 제목·가수 이름을 입력하거나 MP3 파일을 선택해 주세요.";
+            StatusText.Text = "곡 제목·가수 이름을 입력하거나 MP3 파일 또는 방송 주소를 입력해 주세요.";
             return;
         }
 
@@ -155,45 +155,53 @@ public partial class MainWindow : Window
         SongTitleText.Text = string.Empty;
         SongCreditsText.Text = string.Empty;
 
-        if (File.Exists(value) && !string.Equals(Path.GetExtension(value), ".mp3", StringComparison.OrdinalIgnoreCase))
+        StatusText.Text = "입력 내용을 확인하고 있습니다.";
+        var resolved = await SongInputResolver.ResolveAsync(value);
+
+        if (resolved.IsAiSong)
         {
-            NoticeTitleText.Text = "MP3 파일을 선택해 주세요.";
-            NoticeReasonText.Text = "현재 검색 단계에서는 MP3 파일 또는 곡 검색어를 사용할 수 있습니다.";
-            StatusText.Text = "지원하지 않는 파일 형식입니다.";
             SearchWebView.Visibility = Visibility.Collapsed;
             EmptyScorePanel.Visibility = Visibility.Visible;
+            NoticeTitleText.Text = "AI 곡입니다.";
+            NoticeReasonText.Text = "AI 생성곡으로 판단되어 악보 검색을 진행하지 않습니다.";
+            SongTitleText.Text = string.Empty;
+            SongCreditsText.Text = string.Empty;
+            StatusText.Text = "AI 곡 확인";
             return;
         }
 
-        if (!File.Exists(value) && Uri.TryCreate(value, UriKind.Absolute, out var enteredUri) &&
-            (enteredUri.Scheme == Uri.UriSchemeHttp || enteredUri.Scheme == Uri.UriSchemeHttps))
+        if (string.IsNullOrWhiteSpace(resolved.Title))
         {
-            NoticeTitleText.Text = "인터넷 방송 분석은 아직 준비 중입니다.";
-            NoticeReasonText.Text = "이번 단계에서는 MP3 파일 또는 곡 제목·가수 이름으로 악보 이미지를 검색합니다.";
-            StatusText.Text = "방송 주소 입력은 후속 단계에서 연결합니다.";
             SearchWebView.Visibility = Visibility.Collapsed;
             EmptyScorePanel.Visibility = Visibility.Visible;
+            NoticeTitleText.Text = "곡 정보를 확인하지 못했습니다.";
+            NoticeReasonText.Text = resolved.Message;
+            StatusText.Text = "곡 제목 확인 실패";
             return;
         }
 
-        // 파일 선택 시 경로 전체를 검색어로 전달합니다. 직접 입력한 문장도 그대로 사용합니다.
-        await SearchNaverImagesAsync(value);
+        if (!string.IsNullOrWhiteSpace(resolved.Message))
+            StatusText.Text = resolved.Message;
+
+        await SearchNaverImagesAsync(resolved.Title, resolved.Artist);
     }
 
-    private async Task SearchNaverImagesAsync(string originalInput)
+    private async Task SearchNaverImagesAsync(string title, string artist)
     {
-        var query = originalInput.Trim();
-        var searchText = query + " 악보";
-        var searchUrl = "https://search.naver.com/search.naver?where=image&sm=tab_jum&query=" +
-                        Uri.EscapeDataString(searchText);
+        var query = string.Join(" ", new[] { title, artist }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim();
+        var firstSearchText = query;
+        var imageSearchText = query + " 악보";
+        var firstSearchUrl = "https://search.naver.com/search.naver?query=" + Uri.EscapeDataString(firstSearchText);
+        var imageSearchUrl = "https://search.naver.com/search.naver?where=image&sm=tab_jum&query=" +
+                             Uri.EscapeDataString(imageSearchText);
 
-        NoticeTitleText.Text = "네이버 이미지 검색 결과를 불러오고 있습니다.";
-        NoticeReasonText.Text = "입력한 파일 경로 또는 검색어를 그대로 사용해 악보 이미지를 검색합니다.";
-        StatusText.Text = "네이버 이미지 검색 중...";
+        NoticeTitleText.Text = "곡 정보를 확인하고 악보를 검색하고 있습니다.";
+        NoticeReasonText.Text = "네이버에서 곡 정보를 먼저 확인한 다음, 확인한 제목과 가수명에 '악보'를 더해 이미지 검색을 진행합니다.";
+        StatusText.Text = "네이버 1차 곡 정보 검색 중...";
         SearchWebView.Visibility = Visibility.Visible;
         EmptyScorePanel.Visibility = Visibility.Collapsed;
-        SongTitleText.Text = "네이버 이미지 검색 결과";
-        SongCreditsText.Text = "검색어: " + query;
+        SongTitleText.Text = title;
+        SongCreditsText.Text = string.IsNullOrWhiteSpace(artist) ? "곡 정보 검색" : artist;
 
         try
         {
@@ -204,16 +212,17 @@ public partial class MainWindow : Window
                 SearchWebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
                 SearchWebView.CoreWebView2.Settings.AreDevToolsEnabled = false;
                 SearchWebView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
-                SearchWebView.NavigationCompleted += (_, args) =>
-                {
-                    StatusText.Text = args.IsSuccess
-                        ? "네이버 이미지 검색 결과를 표시했습니다. 악보 이미지를 선택해 원본을 확인하세요."
-                        : "검색 페이지를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.";
-                };
                 _searchBrowserInitialized = true;
             }
 
-            SearchWebView.CoreWebView2.Navigate(searchUrl);
+            await NavigateAndWaitAsync(firstSearchUrl);
+            // 첫 검색으로 곡 정보 확인 단계를 거친 뒤, 같은 곡명·가수명으로 악보 이미지 검색을 실행합니다.
+            await NavigateAndWaitAsync(imageSearchUrl);
+            StatusText.Text = "네이버 악보 이미지 검색 결과를 표시했습니다. 적합한 악보를 확인해 주세요.";
+            SongTitleText.Text = title;
+            SongCreditsText.Text = string.IsNullOrWhiteSpace(artist)
+                ? "검색어: " + imageSearchText
+                : artist + " · 검색어: " + imageSearchText;
         }
         catch (Exception ex)
         {
@@ -222,10 +231,9 @@ public partial class MainWindow : Window
             NoticeTitleText.Text = "앱 안에서 검색 화면을 열지 못했습니다.";
             NoticeReasonText.Text = "WebView2 실행 환경이 없거나 초기화에 실패했습니다. 기본 브라우저로 검색 페이지를 엽니다.";
             StatusText.Text = "외부 브라우저에서 네이버 이미지 검색을 엽니다.";
-
             try
             {
-                Process.Start(new ProcessStartInfo(searchUrl) { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo(imageSearchUrl) { UseShellExecute = true });
             }
             catch
             {
@@ -233,6 +241,28 @@ public partial class MainWindow : Window
                 NoticeReasonText.Text = ex.Message;
             }
         }
+    }
+
+    private async Task NavigateAndWaitAsync(string url)
+    {
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        EventHandler<CoreWebView2NavigationCompletedEventArgs>? handler = null;
+        handler = (_, args) =>
+        {
+            SearchWebView.CoreWebView2.NavigationCompleted -= handler;
+            completion.TrySetResult(args.IsSuccess);
+        };
+        SearchWebView.CoreWebView2.NavigationCompleted += handler;
+        SearchWebView.CoreWebView2.Navigate(url);
+
+        var completed = await Task.WhenAny(completion.Task, Task.Delay(TimeSpan.FromSeconds(25)));
+        if (completed != completion.Task)
+        {
+            SearchWebView.CoreWebView2.NavigationCompleted -= handler;
+            throw new TimeoutException("네이버 검색 페이지 응답 시간이 초과되었습니다.");
+        }
+        if (!await completion.Task)
+            throw new InvalidOperationException("네이버 검색 페이지를 불러오지 못했습니다.");
     }
 
     private void CoreWebView2_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
