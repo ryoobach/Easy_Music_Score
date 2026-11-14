@@ -212,9 +212,13 @@ public partial class MainWindow : Window
     {
         var cleaned = fileName.Trim();
         cleaned = Regex.Replace(cleaned, @"^\s*\d{1,3}[\s._-]+", string.Empty);
-        var parts = Regex.Split(cleaned, @"\s+[-–—]\s+", 2);
-        if (parts.Length == 2)
-            return (parts[1].Trim(), parts[0].Trim());
+        var separator = Regex.Match(cleaned, @"\s+[-–—]\s+");
+        if (separator.Success)
+        {
+            var artist = cleaned[..separator.Index].Trim();
+            var title = cleaned[(separator.Index + separator.Length)..].Trim();
+            return (title, artist);
+        }
         return (cleaned, string.Empty);
     }
 
