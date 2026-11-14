@@ -199,6 +199,11 @@ public partial class MainWindow : Window
         string artist = tagArtist;
         bool confirmedByPublicDatabase = false;
 
+        // 파일 이름이 제목 하나로만 되어 있으면 그 값을 제목 후보로 사용합니다.
+        if (string.IsNullOrWhiteSpace(title) && !fileNameInfo.HasTwoParts &&
+            fileNameInfo.Candidates.Count > 0)
+            title = fileNameInfo.Candidates[0].Title;
+
         if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(artist))
         {
             NoticeTitleText.Text = "곡 정보를 확인하고 있습니다.";
