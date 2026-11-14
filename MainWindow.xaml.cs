@@ -128,13 +128,20 @@ public partial class MainWindow : Window
 
     private void Confirm_Click(object sender, RoutedEventArgs e)
     {
-        var value = _placeholderVisible ? string.Empty : SourceComboBox.Text.Trim();
+        // Read the live editor text before focus changes can replace it with the placeholder.
+        SourceComboBox.ApplyTemplate();
+        var inputEditor = SourceComboBox.Template.FindName("PART_EditableTextBox", SourceComboBox) as TextBox;
+        var enteredText = inputEditor?.Text ?? SourceComboBox.Text;
+        var value = _placeholderVisible ? string.Empty : enteredText.Trim();
         if (string.IsNullOrWhiteSpace(value) || value == Placeholder)
         {
             StatusText.Text = "방송 주소를 입력하거나 MP3 파일을 선택해 주세요.";
             return;
         }
 
+        StatusText.Text = "입력한 내용을 확인하고 있습니다...";
+        NoticeTitleText.Text = "입력 내용을 확인하고 있습니다.";
+        NoticeReasonText.Text = "선택한 파일인지 방송 주소인지 확인하는 중입니다.";
         _settings.LastInput = value;
         _settings.InputHistory.RemoveAll(x => string.Equals(x, value, StringComparison.OrdinalIgnoreCase));
         _settings.InputHistory.Insert(0, value);
@@ -246,7 +253,7 @@ public partial class MainWindow : Window
     private static (List<(string Title, string Artist)> Candidates, bool HasTwoParts) ParseFileName(string fileName)
     {
         var cleaned = fileName.Trim();
-        var separator = Regex.Match(cleaned, @"\\s*[-–—_]\\s*");
+        var separator = Regex.Match(cleaned, @"\s*[-–—_]\s*");
         if (!separator.Success)
             return (new List<(string, string)> { (cleaned, string.Empty) }, false);
 
@@ -269,8 +276,8 @@ public partial class MainWindow : Window
         AddCandidate(right, left);
 
         // 숫자는 제목의 일부일 수 있으므로 원본을 보존하고, 트랙 번호를 뺀 후보도 별도로 확인합니다.
-        var leftWithoutTrackNumber = Regex.Replace(left, @"^\\s*\\d{1,3}[\\s._]+", string.Empty).Trim();
-        var rightWithoutTrackNumber = Regex.Replace(right, @"^\\s*\\d{1,3}[\\s._]+", string.Empty).Trim();
+        var leftWithoutTrackNumber = Regex.Replace(left, @"^\s*\d{1,3}[\s._]+", string.Empty).Trim();
+        var rightWithoutTrackNumber = Regex.Replace(right, @"^\s*\d{1,3}[\s._]+", string.Empty).Trim();
         if (!string.Equals(left, leftWithoutTrackNumber, StringComparison.Ordinal))
         {
             AddCandidate(leftWithoutTrackNumber, right);
