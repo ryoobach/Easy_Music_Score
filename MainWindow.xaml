@@ -1,7 +1,7 @@
 <Window x:Class="EasyMusicScore.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Easy Music Score" Icon="/Assets/EasyMusicScore.ico" Width="1180" Height="780"
+        Title="Easy Music Score" Icon="/Assets/EasyMusicScore.png" Width="1180" Height="780"
         MinWidth="900" MinHeight="620" WindowStyle="None"
         Background="#F3F5F9" ResizeMode="CanResize"
         Loaded="Window_Loaded">
@@ -26,7 +26,7 @@
             <Grid Grid.Row="0" Background="#FFFFFF" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="22,0,0,0">
-                    <Image Source="/Assets/EasyMusicScore.ico" Width="28" Height="28" Stretch="Uniform" Margin="0,0,10,0"/>
+                    <Image Source="/Assets/EasyMusicScore.png" Width="28" Height="28" Stretch="Uniform" Margin="0,0,10,0"/>
                     <TextBlock Text="Easy Music Score" FontSize="17" FontWeight="SemiBold" Foreground="#202938" VerticalAlignment="Center"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
@@ -81,7 +81,7 @@
                         </StackPanel>
                     </ScrollViewer>
                     <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,22">
-                        <Image Source="/Assets/EasyMusicScore.ico" Width="18" Height="18" Stretch="Uniform" Margin="0,0,7,0"/>
+                        <Image Source="/Assets/EasyMusicScore.png" Width="18" Height="18" Stretch="Uniform" Margin="0,0,7,0"/>
                         <TextBlock Text="Ryoo Jaesang &amp; 최피디" FontSize="13" Foreground="#778397" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Grid>

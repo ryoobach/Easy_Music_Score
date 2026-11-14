@@ -7,11 +7,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>EasyMusicScore</AssemblyName>
     <RootNamespace>EasyMusicScore</RootNamespace>
-    <Version>1.03</Version>
+    <Version>1.04</Version>
     <ApplicationIcon>Assets\EasyMusicScore.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="Assets\EasyMusicScore.ico" />
+    <Resource Include="Assets\EasyMusicScore.png" />
   </ItemGroup>
 </Project>
