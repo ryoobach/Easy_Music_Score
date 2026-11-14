@@ -25,7 +25,7 @@ internal static class SongInputResolver
                 return new ResolvedSongInput("", "", false,
                     "방송 주소는 확인했지만 현재 방송에서 곡 제목 정보를 가져오지 못했습니다. 방송국이 곡명 메타데이터를 제공하는지 확인해 주세요.");
 
-            var parsed = ParseTitleArtist(streamTitle);
+            var parsed = ParseTitleArtist(streamTitle, artistFirst: true);
             return new ResolvedSongInput(parsed.Title, parsed.Artist,
                 LooksLikeAiSong(streamTitle), "방송에서 현재 재생 중인 곡 정보를 가져왔습니다.");
         }
@@ -62,7 +62,7 @@ internal static class SongInputResolver
                 : "입력한 곡 제목과 가수명을 검색어로 사용합니다.");
     }
 
-    private static (string Title, string Artist) ParseTitleArtist(string value)
+    private static (string Title, string Artist) ParseTitleArtist(string value, bool artistFirst = false)
     {
         var text = (value ?? "").Trim();
         text = Regex.Replace(text, @"^\s*\d{1,3}\s*[-._) ]+\s*", "");
@@ -73,7 +73,7 @@ internal static class SongInputResolver
         {
             var parts = text.Split(new[] { separator }, 2, StringSplitOptions.TrimEntries);
             if (parts.Length == 2 && !string.IsNullOrWhiteSpace(parts[0]) && !string.IsNullOrWhiteSpace(parts[1]))
-                return (parts[0].Trim(), parts[1].Trim());
+                return artistFirst ? (parts[1].Trim(), parts[0].Trim()) : (parts[0].Trim(), parts[1].Trim());
         }
         return (text, "");
     }
@@ -103,19 +103,26 @@ internal static class SongInputResolver
                 return "";
 
             await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
-            var audio = new byte[interval];
-            await ReadFullyAsync(stream, audio, timeout.Token);
             var lengthByte = new byte[1];
-            await ReadFullyAsync(stream, lengthByte, timeout.Token);
-            var metadataLength = lengthByte[0] * 16;
-            if (metadataLength <= 0) return "";
-
-            var metadata = new byte[metadataLength];
-            await ReadFullyAsync(stream, metadata, timeout.Token);
             var declared = response.Content.Headers.ContentType?.CharSet?.Trim('"', '\'');
-            var raw = DecodeMetadata(metadata, declared).Trim('\0', ' ', '\r', '\n', '\t');
-            var match = Regex.Match(raw, @"(?i)StreamTitle\s*=\s*['""]([^'""]*)['""]");
-            return match.Success ? match.Groups[1].Value.Trim() : "";
+            // Some stations send empty metadata blocks before the first song title.
+            // Keep reading ICY blocks until a title arrives or the timeout expires.
+            while (!timeout.IsCancellationRequested)
+            {
+                var audio = new byte[interval];
+                await ReadFullyAsync(stream, audio, timeout.Token);
+                await ReadFullyAsync(stream, lengthByte, timeout.Token);
+                var metadataLength = lengthByte[0] * 16;
+                if (metadataLength <= 0) continue;
+
+                var metadata = new byte[metadataLength];
+                await ReadFullyAsync(stream, metadata, timeout.Token);
+                var raw = DecodeMetadata(metadata, declared).Trim('\0', ' ', '\r', '\n', '\t');
+                var match = Regex.Match(raw, @"(?i)StreamTitle\s*=\s*['""]([^'""]*)['""]");
+                if (match.Success && !string.IsNullOrWhiteSpace(match.Groups[1].Value))
+                    return match.Groups[1].Value.Trim();
+            }
+            return "";
         }
         catch
         {
