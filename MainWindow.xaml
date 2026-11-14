@@ -92,7 +92,7 @@
             </Grid>
 
             <!-- Main score surface -->
-            <Border Grid.Row="2" Margin="28,0,28,18" Background="White" CornerRadius="12"
+            <Border x:Name="ScoreSurface" Grid.Row="2" Margin="28,0,28,18" Background="White" CornerRadius="12"
                     BorderBrush="#E1E6EE" BorderThickness="1">
                 <Grid>
                     <Grid.RowDefinitions>
