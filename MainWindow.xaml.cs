@@ -213,6 +213,25 @@ public partial class MainWindow : Window
             }
         }
 
+        // 제목은 있지만 가수를 알 수 없으면 제목만으로 공개 음악정보를 검색해
+        // 실제로 등록된 가수 후보를 사용자에게 보여줍니다.
+        if (!string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(artist))
+        {
+            NoticeTitleText.Text = "이 제목으로 등록된 가수를 찾고 있습니다.";
+            NoticeReasonText.Text = "제목이 같은 다른 노래일 수 있으므로 가수 후보를 확인해 주세요.";
+            StatusText.Text = "가수 후보 검색 중...";
+            var artistCandidates = await MusicBrainzLookup.FindArtistsAsync(title);
+            if (artistCandidates.Count > 0)
+            {
+                var picker = new ArtistSelectionWindow(title, artistCandidates) { Owner = this };
+                if (picker.ShowDialog() == true && !string.IsNullOrWhiteSpace(picker.SelectedArtist))
+                {
+                    artist = picker.SelectedArtist;
+                    confirmedByPublicDatabase = true;
+                }
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(title))
         {
             NoticeTitleText.Text = "곡 제목을 확인하지 못했습니다.";
