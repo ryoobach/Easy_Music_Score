@@ -138,7 +138,7 @@ internal static class MusicBrainzLookup
     }
 
     private static string NormalizeTitle(string value) =>
-        Regex.Replace(value ?? string.Empty, @"[\s\p{P}\p{S}]+, string.Empty)
+        Regex.Replace(value ?? string.Empty, @"[\s\p{P}\p{S}]+", string.Empty)
              .ToLowerInvariant();
 
     private static string ReadArtist(JsonElement recording)
