@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -135,11 +136,6 @@ public partial class MainWindow : Window
         }
 
         _settings.LastInput = value;
-        if (File.Exists(value))
-        {
-            _settings.LastFile = value;
-            _settings.LastFolder = Path.GetDirectoryName(value) ?? _settings.LastFolder;
-        }
         _settings.InputHistory.RemoveAll(x => string.Equals(x, value, StringComparison.OrdinalIgnoreCase));
         _settings.InputHistory.Insert(0, value);
         if (_settings.InputHistory.Count > 30) _settings.InputHistory = _settings.InputHistory.Take(30).ToList();
@@ -150,14 +146,80 @@ public partial class MainWindow : Window
         SaveSettings();
 
         _hasPrintableScore = false;
-        StatusText.Text = "입력을 기억했습니다. 실제 곡 분석 및 온라인 악보 검색 기능은 아직 연결되지 않았습니다.";
-        NoticeTitleText.Text = "곡 분석 및 악보 검색 기능 준비 중";
-        NoticeReasonText.Text = "현재 빌드에서는 입력 기록과 화면 구성을 확인할 수 있으며, 실제 곡 식별 및 악보 검색은 아직 연결되지 않았습니다.";
+        SongTitleText.Text = string.Empty;
+        SongCreditsText.Text = string.Empty;
+
+        if (File.Exists(value))
+        {
+            if (!string.Equals(Path.GetExtension(value), ".mp3", StringComparison.OrdinalIgnoreCase))
+            {
+                NoticeTitleText.Text = "MP3 파일을 선택해 주세요.";
+                NoticeReasonText.Text = "현재 버전에서는 MP3 파일의 곡 정보 분석을 지원합니다.";
+                StatusText.Text = "지원하지 않는 파일 형식입니다.";
+                return;
+            }
+
+            _settings.LastFile = value;
+            _settings.LastFolder = Path.GetDirectoryName(value) ?? _settings.LastFolder;
+            SaveSettings();
+            AnalyzeMp3Metadata(value);
+            return;
+        }
+
+        NoticeTitleText.Text = "방송 분석 기능 준비 중";
+        NoticeReasonText.Text = "인터넷 방송의 곡 식별 기능은 아직 연결되지 않았습니다. 이번 버전에서는 컴퓨터에 저장된 MP3 파일의 곡 정보를 먼저 확인합니다.";
+        StatusText.Text = "방송 주소를 기억했습니다. 방송 곡 식별 기능은 후속 버전에서 제공됩니다.";
+    }
+
+    private void AnalyzeMp3Metadata(string path)
+    {
+        string tagTitle = string.Empty;
+        string tagArtist = string.Empty;
+
+        try
+        {
+            using var media = TagLib.File.Create(path);
+            tagTitle = media.Tag.Title?.Trim() ?? string.Empty;
+            tagArtist = media.Tag.Performers?.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))?.Trim() ?? string.Empty;
+        }
+        catch
+        {
+            // 읽을 수 없는 태그라도 파일 이름 분석은 계속 시도합니다.
+        }
+
+        var fileNameInfo = ParseFileName(Path.GetFileNameWithoutExtension(path));
+        var title = !string.IsNullOrWhiteSpace(tagTitle) ? tagTitle : fileNameInfo.Title;
+        var artist = !string.IsNullOrWhiteSpace(tagArtist) ? tagArtist : fileNameInfo.Artist;
+
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            NoticeTitleText.Text = "곡 제목을 확인하지 못했습니다.";
+            NoticeReasonText.Text = "MP3 태그와 파일 이름에서 곡 제목을 찾을 수 없습니다. 파일 이름을 '가수 이름 - 노래 제목.mp3' 형식으로 정리해 보세요.";
+            StatusText.Text = "MP3 곡 정보 분석을 완료했지만 제목을 찾지 못했습니다.";
+            return;
+        }
+
+        SongTitleText.Text = title;
+        SongCreditsText.Text = string.IsNullOrWhiteSpace(artist) ? "가수 정보 없음" : artist;
+        NoticeTitleText.Text = "곡 정보를 확인했습니다.";
+        NoticeReasonText.Text = "MP3 태그와 파일 이름에서 읽은 정보입니다. 음원 자체를 인식한 결과는 아니며, 실제 악보 검색은 아직 연결되지 않았습니다.";
+        StatusText.Text = string.IsNullOrWhiteSpace(artist)
+            ? $"곡 제목 확인: {title} (가수 정보 없음)"
+            : $"곡 정보 확인: {artist} - {title}";
+    }
+
+    private static (string Title, string Artist) ParseFileName(string fileName)
+    {
+        var cleaned = fileName.Trim();
+        cleaned = Regex.Replace(cleaned, @"^\s*\d{1,3}[\s._-]+", string.Empty);
+        var parts = Regex.Split(cleaned, @"\s+[-–—]\s+", 2);
+        if (parts.Length == 2)
+            return (parts[1].Trim(), parts[0].Trim());
+        return (cleaned, string.Empty);
     }
 
     private void Print_Click(object sender, RoutedEventArgs e)
     {
-        // 안내 화면이나 프로그램 UI 프레임을 악보처럼 인쇄하지 않습니다.
         if (!_hasPrintableScore)
         {
             MessageBox.Show(this,
@@ -166,8 +228,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 실제 악보 전용 인쇄 시각 요소가 연결된 경우에만 출력합니다.
-        // 프로그램의 ScoreSurface 전체를 PrintVisual로 인쇄하지 않습니다.
         StatusText.Text = "악보 전용 인쇄 레이아웃을 준비하고 있습니다.";
     }
 

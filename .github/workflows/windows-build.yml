@@ -42,19 +42,19 @@ jobs:
           $bw.Write([UInt16]1); $bw.Write([UInt16]32); $bw.Write([UInt32]$bytes.Length); $bw.Write([UInt32]22)
           $bw.Write($bytes); $bw.Close(); $fs.Close()
           $g.Dispose(); $bmp.Dispose(); $source.Dispose(); $ms.Dispose()
-      - name: Publish self-contained Windows app
-        run: dotnet publish EasyMusicScore.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
-      - name: Package runnable application
+      - name: Publish self-contained single-file Windows app
+        run: dotnet publish EasyMusicScore.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o publish
+      - name: Prepare standalone EXE
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release | Out-Null
-          Copy-Item publish\* release\ -Recurse -Force
-          Rename-Item release\EasyMusicScore.exe EasyMusicScore_v1.04.exe
-          Compress-Archive -Path release\* -DestinationPath EasyMusicScore_v1.04-Windows-x64.zip -Force
-      - name: Upload Windows ZIP
+          if (!(Test-Path publish\EasyMusicScore.exe)) { throw 'Published EXE was not found.' }
+          Move-Item publish\EasyMusicScore.exe release\EasyMusicScore_v1.05.exe
+          Get-Item release\EasyMusicScore_v1.05.exe | Format-List Name,Length
+      - name: Upload standalone EXE
         uses: actions/upload-artifact@v4
         with:
-          name: EasyMusicScore_v1.04-Windows-x64
-          path: EasyMusicScore_v1.04-Windows-x64.zip
+          name: EasyMusicScore_v1.05-Windows-x64
+          path: release\EasyMusicScore_v1.05.exe
           if-no-files-found: error
           retention-days: 14

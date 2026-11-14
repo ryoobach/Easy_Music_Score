@@ -7,10 +7,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>EasyMusicScore</AssemblyName>
     <RootNamespace>EasyMusicScore</RootNamespace>
-    <Version>1.04</Version>
+    <Version>1.05</Version>
     <ApplicationIcon>Assets\EasyMusicScore.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="TagLibSharp" Version="2.3.0" />
+  </ItemGroup>
   <ItemGroup>
     <Resource Include="Assets\EasyMusicScore.ico" />
     <Resource Include="Assets\EasyMusicScore.png" />
