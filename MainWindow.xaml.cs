@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private string SettingsPath => Path.Combine(_settingsDirectory, "settings.json");
     private AppSettings _settings = new();
     private bool _placeholderVisible = true;
+    private bool _hasPrintableScore = false;
 
     public MainWindow()
     {
@@ -148,6 +149,7 @@ public partial class MainWindow : Window
         SourceComboBox.Text = value;
         SaveSettings();
 
+        _hasPrintableScore = false;
         StatusText.Text = "입력을 기억했습니다. 실제 곡 분석 및 온라인 악보 검색 기능은 아직 연결되지 않았습니다.";
         NoticeTitleText.Text = "곡 분석 및 악보 검색 기능 준비 중";
         NoticeReasonText.Text = "현재 빌드에서는 입력 기록과 화면 구성을 확인할 수 있으며, 실제 곡 식별 및 악보 검색은 아직 연결되지 않았습니다.";
@@ -155,8 +157,18 @@ public partial class MainWindow : Window
 
     private void Print_Click(object sender, RoutedEventArgs e)
     {
-        var printDialog = new PrintDialog();
-        if (printDialog.ShowDialog() == true) printDialog.PrintVisual(ScoreSurface, "Easy Music Score");
+        // 안내 화면이나 프로그램 UI 프레임을 악보처럼 인쇄하지 않습니다.
+        if (!_hasPrintableScore)
+        {
+            MessageBox.Show(this,
+                "인쇄할 악보가 아직 없습니다. 실제 악보가 화면에 표시된 후 인쇄해 주세요.",
+                "Easy Music Score", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // 실제 악보 전용 인쇄 시각 요소가 연결된 경우에만 출력합니다.
+        // 프로그램의 ScoreSurface 전체를 PrintVisual로 인쇄하지 않습니다.
+        StatusText.Text = "악보 전용 인쇄 레이아웃을 준비하고 있습니다.";
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
