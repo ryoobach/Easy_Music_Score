@@ -47,6 +47,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path release | Out-Null
           Copy-Item publish\* release\ -Recurse -Force
+          Rename-Item release\EasyMusicScore.exe EasyMusicScore_v1.02.exe
           Compress-Archive -Path release\* -DestinationPath EasyMusicScore_v1.02-Windows-x64.zip -Force
       - name: Upload Windows ZIP
         uses: actions/upload-artifact@v4
