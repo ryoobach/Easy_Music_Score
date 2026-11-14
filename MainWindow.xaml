@@ -29,7 +29,7 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="22,0,0,0">
                     <Image Source="/Assets/EasyMusicScore.png" Width="28" Height="28" Stretch="Uniform" Margin="0,0,10,0"/>
                     <TextBlock Text="Easy Music Score" FontSize="17" FontWeight="SemiBold" Foreground="#202938" VerticalAlignment="Center"/>
-                    <TextBlock Text="v1.09" FontSize="11" Foreground="#8994A5" VerticalAlignment="Center" Margin="9,4,0,0"/>
+                    <TextBlock Text="v1.10" FontSize="11" Foreground="#8994A5" VerticalAlignment="Center" Margin="9,4,0,0"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <Button Style="{StaticResource WindowButton}" Content="—" Click="Minimize_Click"/>
