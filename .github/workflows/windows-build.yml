@@ -49,12 +49,12 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path release | Out-Null
           if (!(Test-Path publish\EasyMusicScore.exe)) { throw 'Published EXE was not found.' }
-          Move-Item publish\EasyMusicScore.exe release\EasyMusicScore_v1.05.exe
-          Get-Item release\EasyMusicScore_v1.05.exe | Format-List Name,Length
+          Move-Item publish\EasyMusicScore.exe release\EasyMusicScore_v1.06.exe
+          Get-Item release\EasyMusicScore_v1.06.exe | Format-List Name,Length
       - name: Upload standalone EXE
         uses: actions/upload-artifact@v4
         with:
-          name: EasyMusicScore_v1.05-Windows-x64
-          path: release\EasyMusicScore_v1.05.exe
+          name: EasyMusicScore_v1.06-Windows-x64
+          path: release\EasyMusicScore_v1.06.exe
           if-no-files-found: error
           retention-days: 14

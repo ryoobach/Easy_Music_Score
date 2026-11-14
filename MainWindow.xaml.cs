@@ -171,7 +171,7 @@ public partial class MainWindow : Window
         StatusText.Text = "방송 주소를 기억했습니다. 방송 곡 식별 기능은 후속 버전에서 제공됩니다.";
     }
 
-    private void AnalyzeMp3Metadata(string path)
+    private async void AnalyzeMp3Metadata(string path)
     {
         string tagTitle = string.Empty;
         string tagArtist = string.Empty;
@@ -184,42 +184,105 @@ public partial class MainWindow : Window
         }
         catch
         {
-            // 읽을 수 없는 태그라도 파일 이름 분석은 계속 시도합니다.
+            // 태그가 없거나 손상되어도 파일 이름과 무료 공개 음악정보를 확인합니다.
         }
 
         var fileNameInfo = ParseFileName(Path.GetFileNameWithoutExtension(path));
-        var title = !string.IsNullOrWhiteSpace(tagTitle) ? tagTitle : fileNameInfo.Title;
-        var artist = !string.IsNullOrWhiteSpace(tagArtist) ? tagArtist : fileNameInfo.Artist;
+        string title = tagTitle;
+        string artist = tagArtist;
+        bool confirmedByPublicDatabase = false;
+
+        if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(artist))
+        {
+            NoticeTitleText.Text = "곡 정보를 확인하고 있습니다.";
+            NoticeReasonText.Text = "파일 이름의 앞뒤를 모두 살펴보고, 무료 음악 정보 자료와 대조하고 있습니다.";
+            StatusText.Text = "무료 음악 정보 확인 중...";
+            var match = await MusicBrainzLookup.FindAsync(fileNameInfo.Candidates);
+            if (match.HasValue)
+            {
+                if (string.IsNullOrWhiteSpace(title)) title = match.Value.Title;
+                if (string.IsNullOrWhiteSpace(artist)) artist = match.Value.Artist;
+                confirmedByPublicDatabase = true;
+            }
+        }
 
         if (string.IsNullOrWhiteSpace(title))
         {
             NoticeTitleText.Text = "곡 제목을 확인하지 못했습니다.";
-            NoticeReasonText.Text = "MP3 태그와 파일 이름에서 곡 제목을 찾을 수 없습니다. 파일 이름을 '가수 이름 - 노래 제목.mp3' 형식으로 정리해 보세요.";
-            StatusText.Text = "MP3 곡 정보 분석을 완료했지만 제목을 찾지 못했습니다.";
+            NoticeReasonText.Text = "파일 이름에서 제목을 확실하게 구분하지 못했습니다. 잘못된 정보를 정답처럼 표시하지 않았습니다.";
+            StatusText.Text = "곡 제목을 확인하지 못했습니다.";
             return;
         }
 
         SongTitleText.Text = title;
-        SongCreditsText.Text = string.IsNullOrWhiteSpace(artist) ? "가수 정보 없음" : artist;
-        NoticeTitleText.Text = "곡 정보를 확인했습니다.";
-        NoticeReasonText.Text = "MP3 태그와 파일 이름에서 읽은 정보입니다. 음원 자체를 인식한 결과는 아니며, 실제 악보 검색은 아직 연결되지 않았습니다.";
-        StatusText.Text = string.IsNullOrWhiteSpace(artist)
-            ? $"곡 제목 확인: {title} (가수 정보 없음)"
-            : $"곡 정보 확인: {artist} - {title}";
+        SongCreditsText.Text = string.IsNullOrWhiteSpace(artist) ? "가수 정보 확인 필요" : artist;
+
+        if (confirmedByPublicDatabase)
+        {
+            NoticeTitleText.Text = "곡 정보를 무료 자료에서 확인했습니다.";
+            NoticeReasonText.Text = "공개 음악 정보 자료에서 제목과 가수의 조합을 확인했습니다. 아직 악보 자체를 찾은 것은 아닙니다.";
+            StatusText.Text = $"곡 정보 확인: {artist} - {title}";
+        }
+        else if (!string.IsNullOrWhiteSpace(tagTitle) || !string.IsNullOrWhiteSpace(tagArtist))
+        {
+            NoticeTitleText.Text = "MP3에 저장된 곡 정보를 읽었습니다.";
+            NoticeReasonText.Text = "파일에 저장된 정보를 표시했습니다. 공개 자료에서 제목과 가수의 조합은 확인하지 못했습니다.";
+            StatusText.Text = "MP3 저장 정보 확인 완료";
+        }
+        else if (fileNameInfo.HasTwoParts)
+        {
+            NoticeTitleText.Text = "제목과 가수를 확실히 구분하지 못했습니다.";
+            NoticeReasonText.Text = "파일 이름의 앞부분과 뒷부분을 모두 확인했지만 무료 자료에서 일치하는 곡을 찾지 못했습니다. 추측한 정보를 정답처럼 표시하지 않았습니다.";
+            StatusText.Text = "곡 정보 확인이 필요합니다.";
+        }
+        else
+        {
+            NoticeTitleText.Text = "파일 이름에서 곡 제목 후보를 읽었습니다.";
+            NoticeReasonText.Text = "가수 정보는 확인되지 않았습니다. 파일 이름만으로 확실하지 않은 정보는 추측하지 않았습니다.";
+            StatusText.Text = $"곡 제목 후보: {title}";
+        }
     }
 
-    private static (string Title, string Artist) ParseFileName(string fileName)
+    private static (List<(string Title, string Artist)> Candidates, bool HasTwoParts) ParseFileName(string fileName)
     {
         var cleaned = fileName.Trim();
-        cleaned = Regex.Replace(cleaned, @"^\s*\d{1,3}[\s._-]+", string.Empty);
-        var separator = Regex.Match(cleaned, @"\s+[-–—]\s+");
-        if (separator.Success)
+        var separator = Regex.Match(cleaned, @"\\s*[-–—_]\\s*");
+        if (!separator.Success)
+            return (new List<(string, string)> { (cleaned, string.Empty) }, false);
+
+        var left = cleaned[..separator.Index].Trim();
+        var right = cleaned[(separator.Index + separator.Length)..].Trim();
+        var candidates = new List<(string Title, string Artist)>();
+
+        void AddCandidate(string possibleTitle, string possibleArtist)
         {
-            var artist = cleaned[..separator.Index].Trim();
-            var title = cleaned[(separator.Index + separator.Length)..].Trim();
-            return (title, artist);
+            possibleTitle = possibleTitle.Trim();
+            possibleArtist = possibleArtist.Trim();
+            if (string.IsNullOrWhiteSpace(possibleTitle) || string.IsNullOrWhiteSpace(possibleArtist)) return;
+            if (!candidates.Any(x => string.Equals(x.Title, possibleTitle, StringComparison.OrdinalIgnoreCase) &&
+                                     string.Equals(x.Artist, possibleArtist, StringComparison.OrdinalIgnoreCase)))
+                candidates.Add((possibleTitle, possibleArtist));
         }
-        return (cleaned, string.Empty);
+
+        // '가수 - 제목'인지 '제목 - 가수'인지 미리 단정하지 않습니다.
+        AddCandidate(left, right);
+        AddCandidate(right, left);
+
+        // 숫자는 제목의 일부일 수 있으므로 원본을 보존하고, 트랙 번호를 뺀 후보도 별도로 확인합니다.
+        var leftWithoutTrackNumber = Regex.Replace(left, @"^\\s*\\d{1,3}[\\s._]+", string.Empty).Trim();
+        var rightWithoutTrackNumber = Regex.Replace(right, @"^\\s*\\d{1,3}[\\s._]+", string.Empty).Trim();
+        if (!string.Equals(left, leftWithoutTrackNumber, StringComparison.Ordinal))
+        {
+            AddCandidate(leftWithoutTrackNumber, right);
+            AddCandidate(right, leftWithoutTrackNumber);
+        }
+        if (!string.Equals(right, rightWithoutTrackNumber, StringComparison.Ordinal))
+        {
+            AddCandidate(left, rightWithoutTrackNumber);
+            AddCandidate(rightWithoutTrackNumber, left);
+        }
+
+        return (candidates, true);
     }
 
     private void Print_Click(object sender, RoutedEventArgs e)
