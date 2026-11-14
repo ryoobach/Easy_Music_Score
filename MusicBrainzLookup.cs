@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;\nusing System.Text.RegularExpressions;
+using System.Linq;
+using System.Text.RegularExpressions;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace EasyMusicScore;\n\ninternal sealed record ArtistCandidate(string Artist, string Album, string Year);
+namespace EasyMusicScore;
+
+internal sealed record ArtistCandidate(string Artist, string Album, string Year);
 
 internal static class MusicBrainzLookup
 {
