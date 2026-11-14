@@ -83,7 +83,7 @@ public partial class MainWindow : Window
 
     private Visual FindScoreVisual()
     {
-        return (Visual)((Border)((Grid)Content).Children[0]).Child;
+        return ScoreSurface;
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
