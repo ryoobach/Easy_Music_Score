@@ -218,11 +218,19 @@ public partial class MainWindow : Window
             await NavigateAndWaitAsync(firstSearchUrl);
             // 첫 검색으로 곡 정보 확인 단계를 거친 뒤, 같은 곡명·가수명으로 악보 이미지 검색을 실행합니다.
             await NavigateAndWaitAsync(imageSearchUrl);
-            StatusText.Text = "네이버 악보 이미지 검색 결과를 표시했습니다. 적합한 악보를 확인해 주세요.";
+            StatusText.Text = "네이버 이미지 결과에서 악보 후보를 분석하고 있습니다.";
+            var candidates = await CollectScoreImageCandidatesAsync();
+            if (candidates.Count == 0)
+                throw new InvalidOperationException("이미지 검색 결과에서 표시 가능한 악보 후보를 찾지 못했습니다.");
+
+            var best = candidates[0];
+            var html = BuildSelectedScoreHtml(title, artist, best.Url, candidates.Count);
+            SearchWebView.NavigateToString(html);
+            StatusText.Text = $"악보 후보 {candidates.Count}개를 확인했습니다. 가장 적합한 이미지 1개를 표시합니다.";
             SongTitleText.Text = title;
             SongCreditsText.Text = string.IsNullOrWhiteSpace(artist)
-                ? "검색어: " + imageSearchText
-                : artist + " · 검색어: " + imageSearchText;
+                ? "선택된 악보 이미지"
+                : artist + " · 선택된 악보 이미지";
         }
         catch (Exception ex)
         {
@@ -241,6 +249,61 @@ public partial class MainWindow : Window
                 NoticeReasonText.Text = ex.Message;
             }
         }
+    }
+
+    private async Task<List<ScoreImageCandidate>> CollectScoreImageCandidatesAsync()
+    {
+        const string script = @"(() => {
+          const seen = new Set();
+          const items = [];
+          const imgs = Array.from(document.images);
+          for (const img of imgs) {
+            const url = img.currentSrc || img.src || img.getAttribute('data-src') || '';
+            if (!url || !/^https?:/i.test(url) || seen.has(url)) continue;
+            seen.add(url);
+            const w = img.naturalWidth || img.width || 0;
+            const h = img.naturalHeight || img.height || 0;
+            if (w < 180 || h < 100) continue;
+            const text = ((img.alt || '') + ' ' + (img.title || '') + ' ' +
+              (img.closest('a')?.innerText || '')).trim().slice(0,500);
+            const area = Math.min(w*h, 3000000);
+            let score = Math.min(area / 12000, 100);
+            if (/(악보|score|sheet music|music sheet|기타 코드|코드 악보|가사)/i.test(text)) score += 100;
+            if (/(광고|배너|프로필|앨범|포스터|로고)/i.test(text)) score -= 80;
+            items.push({url, text, w, h, score});
+          }
+          return items.sort((a,b)=>b.score-a.score).slice(0,50);
+        })()";
+        var json = await SearchWebView.CoreWebView2.ExecuteScriptAsync(script);
+        var decoded = JsonSerializer.Deserialize<string>(json) ?? "[]";
+        return JsonSerializer.Deserialize<List<ScoreImageCandidate>>(decoded) ?? new();
+    }
+
+    private static string BuildSelectedScoreHtml(string title, string artist, string imageUrl, int count)
+    {
+        var safeTitle = System.Net.WebUtility.HtmlEncode(title);
+        var safeArtist = System.Net.WebUtility.HtmlEncode(artist);
+        var safeUrl = System.Net.WebUtility.HtmlEncode(imageUrl);
+        return $@"<!doctype html><html lang='ko'><head><meta charset='utf-8'>
+          <meta name='viewport' content='width=device-width,initial-scale=1'>
+          <style>
+          *{{box-sizing:border-box}} body{{margin:0;background:#fff;color:#202938;font-family:'Malgun Gothic',sans-serif}}
+          header{{padding:16px 20px;text-align:center;border-bottom:1px solid #e5e9f0}}
+          h2{{font-size:19px;margin:0 0 6px}} p{{font-size:12px;color:#778397;margin:0}}
+          main{{height:calc(100vh - 86px);display:flex;align-items:center;justify-content:center;padding:12px;overflow:auto}}
+          img{{max-width:100%;max-height:100%;object-fit:contain}} .note{{padding:20px;color:#778397}}
+          </style></head><body><header><h2>{safeTitle}</h2><p>{safeArtist} · 후보 {count}개 중 우선순위가 가장 높은 악보 이미지</p></header>
+          <main><img src='{safeUrl}' alt='선택된 악보 이미지' onerror=""this.style.display='none';document.getElementById('err').style.display='block'""/>
+          <div id='err' class='note' style='display:none'>선택한 이미지에 접근할 수 없습니다. 다음 단계에서 후보 대체 선택을 추가합니다.</div></main></body></html>";
+    }
+
+    private sealed class ScoreImageCandidate
+    {
+        public string Url { get; set; } = "";
+        public string Text { get; set; } = "";
+        public int W { get; set; }
+        public int H { get; set; }
+        public double Score { get; set; }
     }
 
     private async Task NavigateAndWaitAsync(string url)
