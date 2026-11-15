@@ -49,22 +49,22 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path release | Out-Null
           if (!(Test-Path publish\EasyMusicScore.exe)) { throw 'Published EXE was not found.' }
-          Move-Item publish\EasyMusicScore.exe release\EasyMusicScore_v1.16.exe
-          Get-Item release\EasyMusicScore_v1.16.exe | Format-List Name,Length
+          Move-Item publish\EasyMusicScore.exe release\EasyMusicScore_v1.17.exe
+          Get-Item release\EasyMusicScore_v1.17.exe | Format-List Name,Length
       - name: Publish standalone EXE release asset
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.16
-          name: Easy Music Score v1.16
+          tag_name: v1.17
+          name: Easy Music Score v1.17
           draft: false
           prerelease: true
-          files: release\\EasyMusicScore_v1.16.exe
+          files: release\\EasyMusicScore_v1.17.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload standalone EXE
         uses: actions/upload-artifact@v4
         with:
-          name: EasyMusicScore_v1.16-Windows-x64
-          path: release\EasyMusicScore_v1.16.exe
+          name: EasyMusicScore_v1.17-Windows-x64
+          path: release\EasyMusicScore_v1.17.exe
           if-no-files-found: error
           retention-days: 14
