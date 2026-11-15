@@ -285,7 +285,7 @@ public partial class MainWindow : Window
         try
         {
             const string script = @"(() => {
-              const text = (document.body?.innerText || '').replace(/\\s+/g, ' ');
+              const text = (document.body?.innerText || '').replace(/\s+/g, ' ');
               return /검색결과가 없습니다|검색 결과가 없습니다|검색 결과가 없어요|찾으시는 이미지가 없습니다|결과가 없습니다/.test(text);
             })()";
             var result = await SearchWebView.CoreWebView2.ExecuteScriptAsync(script);
@@ -311,7 +311,7 @@ public partial class MainWindow : Window
           const wanted = normalize({titleJson});
           function normalize(value) {{
             return (value || '').normalize('NFKC').toLocaleLowerCase('ko-KR')
-              .replace(/[^\\p{{L}}\\p{{N}}]/gu, '');
+              .replace(/[^\p{{L}}\p{{N}}]/gu, '');
           }}
           const seen = new Set();
           const items = [];
@@ -329,7 +329,7 @@ public partial class MainWindow : Window
             const h = img.naturalHeight || img.height || 0;
             if (w < 180 || h < 100) continue;
             const text = (cardText || labels).slice(0,1000);
-            const artist = (cardText || anchor?.innerText || '').split(/[\\r\\n]+/).map(v => v.trim())
+            const artist = (cardText || anchor?.innerText || '').split(/[\r\n]+/).map(v => v.trim())
               .filter(v => v.length >= 2 && v.length <= 40)
               .filter(v => normalize(v) !== wanted)
               .filter(v => !/(악보|이미지|네이버|블로그|카페|검색|광고|공유|저장|보기|다운로드)/i.test(v))[0] || '';
