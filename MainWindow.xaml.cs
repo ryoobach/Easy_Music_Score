@@ -343,8 +343,8 @@ public partial class MainWindow : Window
           return items.sort((a,b)=>b.score-a.score).slice(0,50);
         }})()";
         var json = await SearchWebView.CoreWebView2.ExecuteScriptAsync(script);
-        var decoded = JsonSerializer.Deserialize<string>(json) ?? "[]";
-        return JsonSerializer.Deserialize<List<ScoreImageCandidate>>(decoded, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+        // ExecuteScriptAsync returns the JavaScript array as JSON directly; it is not a JSON string wrapper.
+        return JsonSerializer.Deserialize<List<ScoreImageCandidate>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
     }
 
     private static string BuildSelectedScoreHtml(string title, string artist, string imageUrl, int count)
