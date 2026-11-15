@@ -198,7 +198,7 @@ public partial class MainWindow : Window
 
         NoticeTitleText.Text = "곡 정보를 확인하고 악보를 검색하고 있습니다.";
         NoticeReasonText.Text = "가수 이름은 검색어에서 제외하고 노래 제목만으로 악보 이미지를 검색합니다.";
-        StatusText.Text = "노래 제목으로 네이버 검색 중...";
+        StatusText.Text = "";
         SearchWebView.Visibility = Visibility.Visible;
         SearchWebView.Opacity = 0;
         SearchWebView.IsHitTestVisible = false;
@@ -222,7 +222,7 @@ public partial class MainWindow : Window
             await NavigateAndWaitAsync(firstSearchUrl);
             // 첫 검색으로 곡 정보 확인 단계를 거친 뒤, 노래 제목만 사용해 악보 이미지 검색을 실행합니다. 가수 이름은 검색 결과 구분에만 활용합니다.
             await NavigateAndWaitAsync(imageSearchUrl);
-            StatusText.Text = "네이버 이미지 결과에서 악보 후보를 분석하고 있습니다.";
+            StatusText.Text = "";
             var candidates = await CollectScoreImageCandidatesAsync(title);
             if (candidates.Count == 0)
             {
