@@ -2,7 +2,6 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -234,20 +233,14 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            SearchWebView.Visibility = Visibility.Collapsed;
-            EmptyScorePanel.Visibility = Visibility.Visible;
-            NoticeTitleText.Text = "앱 안에서 검색 화면을 열지 못했습니다.";
-            NoticeReasonText.Text = "WebView2 실행 환경이 없거나 초기화에 실패했습니다. 기본 브라우저로 검색 페이지를 엽니다.";
-            StatusText.Text = "외부 브라우저에서 네이버 이미지 검색을 엽니다.";
-            try
-            {
-                Process.Start(new ProcessStartInfo(imageSearchUrl) { UseShellExecute = true });
-            }
-            catch
-            {
-                StatusText.Text = "검색 화면을 열지 못했습니다: " + ex.Message;
-                NoticeReasonText.Text = ex.Message;
-            }
+            // 검색 실패 시 외부 브라우저를 띄우지 않습니다.
+            // 앱 내부 검색 화면을 유지하고 실제 오류를 상태 표시줄에 남겨 원인을 확인합니다.
+            SearchWebView.Visibility = Visibility.Visible;
+            EmptyScorePanel.Visibility = Visibility.Collapsed;
+            SongCreditsText.Text = string.IsNullOrWhiteSpace(artist)
+                ? "앱 내부 검색 처리 중 오류"
+                : artist + " · 앱 내부 검색 처리 중 오류";
+            StatusText.Text = "앱 내부 검색 처리 오류: " + ex.Message;
         }
     }
 
