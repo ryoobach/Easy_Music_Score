@@ -248,7 +248,7 @@ public partial class MainWindow : Window
 
             if (candidates.Count == 0)
             {
-                if (!anySearchResults || await IsNaverNoResultsAsync())
+                if (!anySearchResults)
                 {
                     ShowNoScoreNotice();
                     return;
@@ -336,14 +336,14 @@ public partial class MainWindow : Window
           const wanted = normalize(" + titleJson + @");
           function normalize(value) {
             return (value || '').normalize('NFKC').toLocaleLowerCase('ko-KR')
-              .replace(/[^\\p{L}\\p{N}]/gu, '');
+              .replace(/[^\p{L}\p{N}]/gu, '');
           }
           const seen = new Set();
           const items = [];
           const images = Array.from(document.images);
           for (const img of images) {
             const srcset = img.getAttribute('srcset') || '';
-            const srcsetUrl = srcset.split(',').map(x => x.trim().split(/\\s+/)[0]).filter(Boolean).pop() || '';
+            const srcsetUrl = srcset.split(',').map(x => x.trim().split(/\s+/)[0]).filter(Boolean).pop() || '';
             const url = img.currentSrc || img.src ||
               img.getAttribute('data-lazy-src') || img.getAttribute('data-src') ||
               img.getAttribute('data-original') || srcsetUrl || '';
@@ -379,7 +379,7 @@ public partial class MainWindow : Window
             if (sheetMatch) score += 110;
             if (ratio >= 1.15 && ratio <= 2.8) score += 20;
             if (/(광고|배너|프로필|앨범|포스터|로고|상품|쇼핑)/i.test(text)) score -= 120;
-            const artist = text.split(/[\\r\\n]+/).map(v => v.trim())
+            const artist = text.split(/[\r\n]+/).map(v => v.trim())
               .filter(v => v.length >= 2 && v.length <= 40)
               .filter(v => normalize(v) !== wanted)
               .filter(v => !/(악보|이미지|네이버|블로그|카페|검색|광고|공유|저장|보기|다운로드)/i.test(v))[0] || '';
