@@ -187,7 +187,7 @@ public partial class MainWindow : Window
 
     private async Task SearchNaverImagesAsync(string title, string artist)
     {
-        var query = string.Join(" ", new[] { title, artist }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim();
+        var query = string.Join(" ", new[] { "\"" + title + "\"", artist }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim();
         var firstSearchText = query;
         var imageSearchText = query + " 악보";
         var firstSearchUrl = "https://search.naver.com/search.naver?query=" + Uri.EscapeDataString(firstSearchText);
@@ -218,7 +218,7 @@ public partial class MainWindow : Window
             // 첫 검색으로 곡 정보 확인 단계를 거친 뒤, 같은 곡명·가수명으로 악보 이미지 검색을 실행합니다.
             await NavigateAndWaitAsync(imageSearchUrl);
             StatusText.Text = "네이버 이미지 결과에서 악보 후보를 분석하고 있습니다.";
-            var candidates = await CollectScoreImageCandidatesAsync();
+            var candidates = await CollectScoreImageCandidatesAsync(title);
             if (candidates.Count == 0)
                 throw new InvalidOperationException("이미지 검색 결과에서 표시 가능한 악보 후보를 찾지 못했습니다.");
 
@@ -244,29 +244,40 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task<List<ScoreImageCandidate>> CollectScoreImageCandidatesAsync()
+    private async Task<List<ScoreImageCandidate>> CollectScoreImageCandidatesAsync(string title)
     {
-        const string script = @"(() => {
+        var titleJson = JsonSerializer.Serialize(title);
+        var script = $@"(() => {{
+          const wanted = normalize({titleJson});
+          function normalize(value) {{
+            return (value || '').normalize('NFKC').toLocaleLowerCase('ko-KR')
+              .replace(/[^\\p{{L}}\\p{{N}}]/gu, '');
+          }}
           const seen = new Set();
           const items = [];
           const imgs = Array.from(document.images);
-          for (const img of imgs) {
+          for (const img of imgs) {{
             const url = img.currentSrc || img.src || img.getAttribute('data-src') || '';
             if (!url || !/^https?:/i.test(url) || seen.has(url)) continue;
+            const anchorText = img.closest('a')?.innerText || '';
+            const labels = [img.alt || '', img.title || '', anchorText]
+              .flatMap(value => value.split(/[\\r\\n]+/))
+              .map(value => value.trim()).filter(Boolean);
+            // 제목이 결과 제목/설명 한 줄과 완전히 일치하는 경우만 통과시킵니다.
+            if (!labels.some(label => normalize(label) === wanted)) continue;
             seen.add(url);
             const w = img.naturalWidth || img.width || 0;
             const h = img.naturalHeight || img.height || 0;
             if (w < 180 || h < 100) continue;
-            const text = ((img.alt || '') + ' ' + (img.title || '') + ' ' +
-              (img.closest('a')?.innerText || '')).trim().slice(0,500);
+            const text = labels.join(' ').slice(0,500);
             const area = Math.min(w*h, 3000000);
             let score = Math.min(area / 12000, 100);
             if (/(악보|score|sheet music|music sheet|기타 코드|코드 악보|가사)/i.test(text)) score += 100;
             if (/(광고|배너|프로필|앨범|포스터|로고)/i.test(text)) score -= 80;
-            items.push({url, text, w, h, score});
-          }
+            items.push({{url, text, w, h, score}});
+          }}
           return items.sort((a,b)=>b.score-a.score).slice(0,50);
-        })()";
+        }})()";
         var json = await SearchWebView.CoreWebView2.ExecuteScriptAsync(script);
         var decoded = JsonSerializer.Deserialize<string>(json) ?? "[]";
         return JsonSerializer.Deserialize<List<ScoreImageCandidate>>(decoded, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
