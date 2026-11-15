@@ -276,7 +276,7 @@ public partial class MainWindow : Window
         })()";
         var json = await SearchWebView.CoreWebView2.ExecuteScriptAsync(script);
         var decoded = JsonSerializer.Deserialize<string>(json) ?? "[]";
-        return JsonSerializer.Deserialize<List<ScoreImageCandidate>>(decoded) ?? new();
+        return JsonSerializer.Deserialize<List<ScoreImageCandidate>>(decoded, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
     }
 
     private static string BuildSelectedScoreHtml(string title, string artist, string imageUrl, int count)
