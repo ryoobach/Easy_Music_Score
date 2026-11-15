@@ -223,7 +223,20 @@ public partial class MainWindow : Window
             StatusText.Text = "네이버 이미지 결과에서 악보 후보를 분석하고 있습니다.";
             var candidates = await CollectScoreImageCandidatesAsync(title);
             if (candidates.Count == 0)
-                throw new InvalidOperationException("이미지 검색 결과에서 표시 가능한 악보 후보를 찾지 못했습니다.");
+            {
+                if (await IsNaverNoResultsAsync())
+                {
+                    ShowNoScoreNotice();
+                    return;
+                }
+
+                SearchWebView.Visibility = Visibility.Collapsed;
+                EmptyScorePanel.Visibility = Visibility.Visible;
+                NoticeTitleText.Text = "악보를 찾을 수 없습니다.";
+                NoticeReasonText.Text = "검색 결과에서 곡 제목과 일치하는 악보 이미지를 확인하지 못했습니다.";
+                StatusText.Text = "일치하는 악보 후보 없음";
+                return;
+            }
 
             var artistChoices = candidates.Where(x => !string.IsNullOrWhiteSpace(x.Artist))
                 .GroupBy(x => x.Artist.Trim(), StringComparer.OrdinalIgnoreCase)
@@ -257,15 +270,38 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            // 검색 실패 시 외부 브라우저를 띄우지 않습니다.
-            // 앱 내부 검색 화면을 유지하고 실제 오류를 상태 표시줄에 남겨 원인을 확인합니다.
-            SearchWebView.Visibility = Visibility.Visible;
-            EmptyScorePanel.Visibility = Visibility.Collapsed;
-            SongCreditsText.Text = string.IsNullOrWhiteSpace(artist)
-                ? "앱 내부 검색 처리 중 오류"
-                : artist + " · 앱 내부 검색 처리 중 오류";
-            StatusText.Text = "앱 내부 검색 처리 오류: " + ex.Message;
+            // 오류 문구는 가수 이름 영역에 넣지 않고 별도의 안내 영역에 표시합니다.
+            SearchWebView.Visibility = Visibility.Collapsed;
+            EmptyScorePanel.Visibility = Visibility.Visible;
+            NoticeTitleText.Text = "악보 검색 중 문제가 발생했습니다.";
+            NoticeReasonText.Text = "네이버 검색 결과를 확인하는 중 문제가 발생했습니다. 잠시 후 다시 검색해 주세요.";
+            StatusText.Text = "검색 처리 오류: " + ex.Message;
+            SongCreditsText.Text = artist;
         }
+    }
+
+    private async Task<bool> IsNaverNoResultsAsync()
+    {
+        try
+        {
+            const string script = @"(() => {
+              const text = (document.body?.innerText || '').replace(/\\s+/g, ' ');
+              return /검색결과가 없습니다|검색 결과가 없습니다|검색 결과가 없어요|찾으시는 이미지가 없습니다|결과가 없습니다/.test(text);
+            })()";
+            var result = await SearchWebView.CoreWebView2.ExecuteScriptAsync(script);
+            return string.Equals(result, "true", StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
+
+    private void ShowNoScoreNotice()
+    {
+        SearchWebView.Visibility = Visibility.Collapsed;
+        EmptyScorePanel.Visibility = Visibility.Visible;
+        ArtistChoicePanel.Visibility = Visibility.Collapsed;
+        NoticeTitleText.Text = "악보를 찾을 수 없습니다.";
+        NoticeReasonText.Text = "네이버 이미지 검색 결과가 없습니다.";
+        StatusText.Text = "악보 검색 결과 없음";
     }
 
     private async Task<List<ScoreImageCandidate>> CollectScoreImageCandidatesAsync(string title)
@@ -275,36 +311,33 @@ public partial class MainWindow : Window
           const wanted = normalize({titleJson});
           function normalize(value) {{
             return (value || '').normalize('NFKC').toLocaleLowerCase('ko-KR')
-              .replace(/[^\p{{L}}\p{{N}}]/gu, '');
+              .replace(/[^\\p{{L}}\\p{{N}}]/gu, '');
           }}
           const seen = new Set();
           const items = [];
-          const imgs = Array.from(document.images);
-          for (const img of imgs) {{
+          for (const img of Array.from(document.images)) {{
             const url = img.currentSrc || img.src || img.getAttribute('data-src') || '';
             if (!url || !/^https?:/i.test(url) || seen.has(url)) continue;
             const anchor = img.closest('a');
             const card = img.closest('li') || img.closest('[class*=item]') || img.closest('[class*=card]') || anchor?.parentElement;
-            const anchorText = anchor?.innerText || '';
-            const cardText = card?.innerText || anchorText;
-            const labels = [img.alt || '', img.title || '', anchorText]
-              .flatMap(value => value.split(/[\r\n]+/))
-              .map(value => value.trim()).filter(Boolean);
-            // 제목이 결과 제목/설명 한 줄과 완전히 일치하는 경우만 통과시킵니다.
-            if (!labels.some(label => normalize(label) === wanted)) continue;
-            seen.add(url);
+            const cardText = (card?.innerText || anchor?.innerText || '').trim();
+            const labels = [img.alt || '', img.title || '', anchor?.innerText || ''].join(' ');
+            const combined = normalize(cardText + ' ' + labels);
+            // 이미지 설명 한 줄의 완전 일치만 요구하지 않고, 결과 카드 전체에서 제목 일치를 확인합니다.
+            if (!combined.includes(wanted)) continue;
             const w = img.naturalWidth || img.width || 0;
             const h = img.naturalHeight || img.height || 0;
             if (w < 180 || h < 100) continue;
-            const text = (cardText || labels.join(' ')).slice(0,1000);
-            const artist = (cardText || anchorText).split(/[\r\n]+/).map(v => v.trim())
+            const text = (cardText || labels).slice(0,1000);
+            const artist = (cardText || anchor?.innerText || '').split(/[\\r\\n]+/).map(v => v.trim())
               .filter(v => v.length >= 2 && v.length <= 40)
               .filter(v => normalize(v) !== wanted)
               .filter(v => !/(악보|이미지|네이버|블로그|카페|검색|광고|공유|저장|보기|다운로드)/i.test(v))[0] || '';
             const area = Math.min(w*h, 3000000);
             let score = Math.min(area / 12000, 100);
-            if (/(악보|score|sheet music|music sheet|기타 코드|코드 악보|가사)/i.test(text)) score += 100;
+            if (/(악보|score|sheet music|music sheet|기타 코드|코드 악보|가사)/i.test(text + ' ' + labels)) score += 100;
             if (/(광고|배너|프로필|앨범|포스터|로고)/i.test(text)) score -= 80;
+            seen.add(url);
             items.push({{url, text, artist, w, h, score}});
           }}
           return items.sort((a,b)=>b.score-a.score).slice(0,50);
