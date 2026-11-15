@@ -29,7 +29,7 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="22,0,0,0">
                     <Image Source="/Assets/EasyMusicScore.png" Width="28" Height="28" Stretch="Uniform" Margin="0,0,10,0"/>
                     <TextBlock Text="Easy Music Score" FontSize="17" FontWeight="SemiBold" Foreground="#202938" VerticalAlignment="Center"/>
-                    <TextBlock Text="v1.19" FontSize="11" Foreground="#8994A5" VerticalAlignment="Center" Margin="9,4,0,0"/>
+                    <TextBlock Text="v1.20" FontSize="11" Foreground="#8994A5" VerticalAlignment="Center" Margin="9,4,0,0"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <Button Style="{StaticResource WindowButton}" Content="—" Click="Minimize_Click"/>
@@ -84,9 +84,9 @@
                             <TextBlock x:Name="NoticeTitleText" Text="음원을 선택하거나 검색어를 입력해 주세요." FontSize="24" FontWeight="Bold" Foreground="#8792A4" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,10"/>
                             <TextBlock x:Name="NoticeReasonText" Text="" FontSize="14" Foreground="#778397" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,24"/>
                             <TextBlock Text="Easy Music Score 사용 방법" FontSize="16" FontWeight="SemiBold" Foreground="#35445B" HorizontalAlignment="Center" Margin="0,0,0,12"/>
-                            <TextBlock Text="1. MP3 파일을 선택하거나 곡 제목·가수 이름을 입력합니다.&#10;2. 검색 버튼을 누릅니다.&#10;3. 네이버 이미지 검색 결과가 이 영역에 표시됩니다.&#10;4. 악보 이미지를 선택해 원본 페이지와 악보 정보를 확인합니다.&#10;5. 파일 경로를 선택해도 되고, 검색어를 직접 입력해도 됩니다."
+                            <TextBlock Text="1. MP3 파일을 선택하거나 곡 제목·가수 이름을 입력합니다.&#10;2. 검색 버튼을 누릅니다.&#10;3. 프로그램이 검색 결과에서 곡 제목과 일치하는 악보를 분석합니다.&#10;4. 가장 적합한 악보 이미지 한 장을 골라 표시합니다.&#10;5. 찾지 못하면 “악보를 찾을 수 없습니다.”라고 안내합니다."
                                        FontSize="14" LineHeight="27" Foreground="#68768B" TextAlignment="Left" HorizontalAlignment="Center"/>
-                            <TextBlock Text="※ 현재 단계는 네이버 이미지 검색 결과를 표시합니다. 악보 파일 변환·인쇄 기능은 다음 단계에서 연결합니다." FontSize="12" Foreground="#8A96A8" Margin="0,18,0,0" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
+                            <TextBlock Text="※ 검색 결과 목록을 그대로 보여주지 않고, 제목에 맞는 악보 후보 한 장을 골라 표시합니다. 오선악보 재구성과 인쇄 기능은 후속 단계에서 연결합니다." FontSize="12" Foreground="#8A96A8" Margin="0,18,0,0" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
                     <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,18">
