@@ -19,7 +19,7 @@ internal static class SongInputResolver
     // MP3의 태그 정보는 사용하지 않고 파일명만 판별 기준으로 사용합니다.
     private static readonly Regex[] AiNamePatterns =
     {
-        new Regex(@"(?<![\p{L}\p{N}])(?:suno(?:\s*ai)?|udio|aiva|soundraw|boomy|loudly|mubert|beatoven(?:\.ai)?|stable[\s._-]*audio|musicgen|riffusion| ಹಾಡio|udioai| Donna[\s._-]*AI)(?![\p{L}\p{N}])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new Regex(@"(?<![\p{L}\p{N}])(?:suno(?:\s*ai)?|udio|aiva|soundraw|boomy|loudly|mubert|beatoven(?:\.ai)?|stable[\s._-]*audio|musicgen|riffusion|udioai|donna[\s._-]*ai)(?![\p{L}\p{N}])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
         new Regex(@"(?<![\p{L}\p{N}])(?:AI[\s._-]*(?:song|music|track|generated|generation|created|composition|composer)|(?:song|music|track)[\s._-]*AI)(?![\p{L}\p{N}])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
         new Regex(@"(?:인공지능|AI)\s*(?:로\s*)?(?:생성|제작|작곡|만든|음악|곡)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
         new Regex(@"(?<![\p{L}\p{N}])AI(?![\p{L}\p{N}])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
