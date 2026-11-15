@@ -56,7 +56,7 @@
                         </Button>
                     </Grid>
                 </Border>
-                <Button Grid.Column="1" Style="{StaticResource ActionButton}" Margin="12,0,0,0" Content="검색" Click="Confirm_Click"/>
+                <Button Grid.Column="1" Style="{StaticResource ActionButton}" Margin="12,0,0,0" Content="확인" Click="Confirm_Click"/>
                 <Button Grid.Column="2" Width="52" Height="44" Margin="10,0,0,0" Background="White" BorderBrush="#D9E0EA" BorderThickness="1" ToolTip="악보 인쇄" Cursor="Hand" Click="Print_Click">
                     <Viewbox Width="25" Height="25"><Canvas Width="32" Height="32">
                         <Path Data="M9,11 L9,4 L23,4 L23,11 M9,23 L5,23 C3.9,23 3,22.1 3,21 L3,14 C3,12.9 3.9,12 5,12 L27,12 C28.1 12 29,12.9 29,14 L29,21 C29,22.1 28.1,23 27,23 L23,23" Stroke="#3769D6" StrokeThickness="2" Fill="Transparent" StrokeLineJoin="Round"/>
@@ -84,7 +84,7 @@
                             <TextBlock x:Name="NoticeTitleText" Text="음원을 선택하거나 검색어를 입력해 주세요." FontSize="24" FontWeight="Bold" Foreground="#8792A4" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,10"/>
                             <TextBlock x:Name="NoticeReasonText" Text="" FontSize="14" Foreground="#778397" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,24"/>
                             <TextBlock Text="Easy Music Score 사용 방법" FontSize="16" FontWeight="SemiBold" Foreground="#35445B" HorizontalAlignment="Center" Margin="0,0,0,12"/>
-                            <TextBlock Text="1. MP3 파일을 선택하거나 곡 제목·가수 이름을 입력합니다.&#10;2. 검색 버튼을 누릅니다.&#10;3. 프로그램이 검색 결과에서 곡 제목과 일치하는 악보를 분석합니다.&#10;4. 가장 적합한 악보 이미지 한 장을 골라 표시합니다.&#10;5. 찾지 못하면 “악보를 찾을 수 없습니다.”라고 안내합니다."
+                            <TextBlock Text="1. MP3 파일을 선택하거나 곡 제목·가수 이름을 입력합니다.&#10;2. 확인 버튼을 누릅니다.&#10;3. 프로그램이 검색 결과에서 곡 제목과 일치하는 악보를 분석합니다.&#10;4. 가장 적합한 악보 이미지 한 장을 골라 표시합니다.&#10;5. 찾지 못하면 “악보를 찾을 수 없습니다.”라고 안내합니다."
                                        FontSize="14" LineHeight="27" Foreground="#68768B" TextAlignment="Left" HorizontalAlignment="Center"/>
                             <TextBlock Text="※ 검색 결과 목록을 그대로 보여주지 않고, 제목에 맞는 악보 후보 한 장을 골라 표시합니다. 오선악보 재구성과 인쇄 기능은 후속 단계에서 연결합니다." FontSize="12" Foreground="#8A96A8" Margin="0,18,0,0" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
                         </StackPanel>
