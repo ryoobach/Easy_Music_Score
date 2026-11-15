@@ -72,12 +72,6 @@
                         <TextBlock x:Name="SongTitleText" Text="" FontSize="25" FontWeight="Bold" Foreground="#202938" HorizontalAlignment="Center"/>
                         <TextBlock x:Name="SongCreditsText" Text="" FontSize="12" Foreground="#778397" HorizontalAlignment="Center" Margin="0,7,0,0" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
-                    <StackPanel x:Name="ArtistChoicePanel" Grid.Row="1" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center" Width="420" Panel.ZIndex="5" Background="White">
-                        <TextBlock Text="같은 제목의 곡이 여러 개 검색되었습니다." FontSize="17" FontWeight="SemiBold" Foreground="#202938" Margin="0,0,0,12"/>
-                        <TextBlock Text="원하는 아티스트를 선택해 주세요." FontSize="13" Foreground="#778397" Margin="0,0,0,10"/>
-                        <ListBox x:Name="ArtistChoiceList" Height="220" FontSize="15" Padding="6" DisplayMemberPath="Artist"/>
-                        <Button Content="선택한 아티스트의 악보 보기" Height="42" Margin="0,12,0,0" Background="#3769D6" Foreground="White" BorderThickness="0" Click="ArtistChoiceConfirm_Click"/>
-                    </StackPanel>
                     <Grid Grid.Row="1">
                         <wv2:WebView2 x:Name="SearchWebView" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                         <StackPanel x:Name="EmptyScorePanel" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="30,24">
