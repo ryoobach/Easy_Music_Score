@@ -22,6 +22,8 @@ public partial class MainWindow : Window
     private bool _placeholderVisible = true;
     private bool _hasPrintableScore = false;
     private bool _searchBrowserInitialized = false;
+    private List<ScoreImageCandidate> _pendingArtistCandidates = new();
+    private string _pendingSongTitle = string.Empty;
 
     public MainWindow()
     {
@@ -222,14 +224,35 @@ public partial class MainWindow : Window
             if (candidates.Count == 0)
                 throw new InvalidOperationException("이미지 검색 결과에서 표시 가능한 악보 후보를 찾지 못했습니다.");
 
-            var best = candidates[0];
-            var html = BuildSelectedScoreHtml(title, artist, best.Url, candidates.Count);
+            var artistChoices = candidates.Where(x => !string.IsNullOrWhiteSpace(x.Artist))
+                .GroupBy(x => x.Artist.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(g => new ArtistChoice { Artist = g.Key, Candidate = g.OrderByDescending(x => x.Score).First() })
+                .OrderByDescending(x => x.Candidate.Score).ToList();
+
+            if (string.IsNullOrWhiteSpace(artist) && artistChoices.Count > 1)
+            {
+                _pendingArtistCandidates = candidates;
+                _pendingSongTitle = title;
+                ArtistChoiceList.ItemsSource = artistChoices;
+                ArtistChoiceList.SelectedIndex = 0;
+                ArtistChoicePanel.Visibility = Visibility.Visible;
+                SearchWebView.Visibility = Visibility.Collapsed;
+                StatusText.Text = "같은 제목의 곡이 여러 개 있습니다. 아티스트를 선택해 주세요.";
+                return;
+            }
+
+            var selectedChoice = artistChoices.FirstOrDefault(x =>
+                !string.IsNullOrWhiteSpace(artist) && string.Equals(x.Artist, artist, StringComparison.OrdinalIgnoreCase));
+            var best = selectedChoice?.Candidate ?? candidates[0];
+            var finalArtist = selectedChoice?.Artist ?? artist;
+            var html = BuildSelectedScoreHtml(title, finalArtist, best.Url, candidates.Count);
             SearchWebView.NavigateToString(html);
             StatusText.Text = $"악보 후보 {candidates.Count}개를 확인했습니다. 가장 적합한 이미지 1개를 표시합니다.";
+            ArtistChoicePanel.Visibility = Visibility.Collapsed;
             SongTitleText.Text = title;
-            SongCreditsText.Text = string.IsNullOrWhiteSpace(artist)
+            SongCreditsText.Text = string.IsNullOrWhiteSpace(finalArtist)
                 ? "선택된 악보 이미지"
-                : artist + " · 선택된 악보 이미지";
+                : finalArtist + " · 선택된 악보 이미지";
         }
         catch (Exception ex)
         {
@@ -259,7 +282,10 @@ public partial class MainWindow : Window
           for (const img of imgs) {{
             const url = img.currentSrc || img.src || img.getAttribute('data-src') || '';
             if (!url || !/^https?:/i.test(url) || seen.has(url)) continue;
-            const anchorText = img.closest('a')?.innerText || '';
+            const anchor = img.closest('a');
+            const card = img.closest('li') || img.closest('[class*=item]') || img.closest('[class*=card]') || anchor?.parentElement;
+            const anchorText = anchor?.innerText || '';
+            const cardText = card?.innerText || anchorText;
             const labels = [img.alt || '', img.title || '', anchorText]
               .flatMap(value => value.split(/[\r\n]+/))
               .map(value => value.trim()).filter(Boolean);
@@ -269,12 +295,16 @@ public partial class MainWindow : Window
             const w = img.naturalWidth || img.width || 0;
             const h = img.naturalHeight || img.height || 0;
             if (w < 180 || h < 100) continue;
-            const text = labels.join(' ').slice(0,500);
+            const text = (cardText || labels.join(' ')).slice(0,1000);
+            const artist = (cardText || anchorText).split(/[\\r\\n]+/).map(v => v.trim())
+              .filter(v => v.length >= 2 && v.length <= 40)
+              .filter(v => normalize(v) !== wanted)
+              .filter(v => !/(악보|이미지|네이버|블로그|카페|검색|광고|공유|저장|보기|다운로드)/i.test(v))[0] || '';
             const area = Math.min(w*h, 3000000);
             let score = Math.min(area / 12000, 100);
             if (/(악보|score|sheet music|music sheet|기타 코드|코드 악보|가사)/i.test(text)) score += 100;
             if (/(광고|배너|프로필|앨범|포스터|로고)/i.test(text)) score -= 80;
-            items.push({{url, text, w, h, score}});
+            items.push({{url, text, artist, w, h, score}});
           }}
           return items.sort((a,b)=>b.score-a.score).slice(0,50);
         }})()";
@@ -305,9 +335,41 @@ public partial class MainWindow : Window
     {
         public string Url { get; set; } = "";
         public string Text { get; set; } = "";
+        public string Artist { get; set; } = "";
         public int W { get; set; }
         public int H { get; set; }
         public double Score { get; set; }
+    }
+
+    private sealed class ArtistChoice
+    {
+        public string Artist { get; set; } = string.Empty;
+        public ScoreImageCandidate Candidate { get; set; } = new();
+    }
+
+    private void ArtistChoiceConfirm_Click(object sender, RoutedEventArgs e)
+    {
+        if (ArtistChoiceList.SelectedItem is not ArtistChoice selected)
+        {
+            StatusText.Text = "아티스트를 선택해 주세요.";
+            return;
+        }
+
+        var candidate = _pendingArtistCandidates
+            .Where(x => string.Equals(x.Artist, selected.Artist, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(x => x.Score).FirstOrDefault();
+        if (candidate == null)
+        {
+            StatusText.Text = "선택한 아티스트의 악보 후보를 찾지 못했습니다.";
+            return;
+        }
+
+        ArtistChoicePanel.Visibility = Visibility.Collapsed;
+        SearchWebView.NavigateToString(BuildSelectedScoreHtml(_pendingSongTitle, selected.Artist, candidate.Url, 1));
+        SearchWebView.Visibility = Visibility.Visible;
+        SongTitleText.Text = _pendingSongTitle;
+        SongCreditsText.Text = selected.Artist + " · 선택된 악보 이미지";
+        StatusText.Text = selected.Artist + "의 악보를 표시합니다.";
     }
 
     private async Task NavigateAndWaitAsync(string url)
