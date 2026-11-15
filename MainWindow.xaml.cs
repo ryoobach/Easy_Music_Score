@@ -296,7 +296,7 @@ public partial class MainWindow : Window
             const h = img.naturalHeight || img.height || 0;
             if (w < 180 || h < 100) continue;
             const text = (cardText || labels.join(' ')).slice(0,1000);
-            const artist = (cardText || anchorText).split(/[\\r\\n]+/).map(v => v.trim())
+            const artist = (cardText || anchorText).split(/[\r\n]+/).map(v => v.trim())
               .filter(v => v.length >= 2 && v.length <= 40)
               .filter(v => normalize(v) !== wanted)
               .filter(v => !/(악보|이미지|네이버|블로그|카페|검색|광고|공유|저장|보기|다운로드)/i.test(v))[0] || '';
