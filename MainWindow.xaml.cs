@@ -213,6 +213,7 @@ public partial class MainWindow : Window
                 SearchWebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
                 SearchWebView.CoreWebView2.Settings.AreDevToolsEnabled = false;
                 SearchWebView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
+                SearchWebView.CoreWebView2.LaunchingExternalUriScheme += CoreWebView2_LaunchingExternalUriScheme;
                 _searchBrowserInitialized = true;
             }
 
@@ -396,10 +397,14 @@ public partial class MainWindow : Window
 
     private void CoreWebView2_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
     {
-        // 새 창을 Windows 기본 브라우저로 보내지 않고 현재 앱의 WebView에 연결합니다.
-        // Navigate()를 별도로 호출하는 대신 WebView2가 새 창 탐색을 직접 현재 화면에서 처리하게 합니다.
-        e.NewWindow = SearchWebView.CoreWebView2;
+        // 팝업과 새 탭 요청은 모두 취소합니다. 앱 밖의 브라우저 창도 열지 않습니다.
         e.Handled = true;
+    }
+
+    private void CoreWebView2_LaunchingExternalUriScheme(object? sender, CoreWebView2LaunchingExternalUriSchemeEventArgs e)
+    {
+        // mailto:, 외부 앱 실행 등 Windows에 넘기는 외부 프로토콜도 차단합니다.
+        e.Cancel = true;
     }
 
     private void Print_Click(object sender, RoutedEventArgs e)
