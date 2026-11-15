@@ -126,7 +126,7 @@ public partial class MainWindow : Window
             _settings.LastFile = dialog.FileName;
             _settings.LastFolder = Path.GetDirectoryName(dialog.FileName) ?? string.Empty;
             SaveSettings();
-            StatusText.Text = "MP3 파일을 선택했습니다. 검색 버튼을 눌러 주세요.";
+            StatusText.Text = "MP3 파일을 선택했습니다. 확인 버튼을 눌러 주세요.";
         }
     }
 
@@ -156,7 +156,7 @@ public partial class MainWindow : Window
         SongTitleText.Text = string.Empty;
         SongCreditsText.Text = string.Empty;
 
-        StatusText.Text = "입력 내용을 확인하고 있습니다.";
+        StatusText.Text = "준비됨";
         var resolved = await SongInputResolver.ResolveAsync(value);
 
         if (resolved.IsAiSong)
@@ -200,6 +200,8 @@ public partial class MainWindow : Window
         NoticeReasonText.Text = "가수 이름은 검색어에서 제외하고 노래 제목만으로 악보 이미지를 검색합니다.";
         StatusText.Text = "노래 제목으로 네이버 검색 중...";
         SearchWebView.Visibility = Visibility.Visible;
+        SearchWebView.Opacity = 0;
+        SearchWebView.IsHitTestVisible = false;
         EmptyScorePanel.Visibility = Visibility.Collapsed;
         SongTitleText.Text = title;
         SongCreditsText.Text = string.IsNullOrWhiteSpace(artist) ? "곡 정보 검색" : artist;
@@ -261,7 +263,9 @@ public partial class MainWindow : Window
             var finalArtist = selectedChoice?.Artist ?? artist;
             var html = BuildSelectedScoreHtml(title, finalArtist, best.Url, candidates.Count);
             SearchWebView.NavigateToString(html);
-            StatusText.Text = $"악보 후보 {candidates.Count}개를 확인했습니다. 가장 적합한 이미지 1개를 표시합니다.";
+            SearchWebView.Opacity = 1;
+            SearchWebView.IsHitTestVisible = true;
+            StatusText.Text = "악보를 찾았습니다.";
             ArtistChoicePanel.Visibility = Visibility.Collapsed;
             SongTitleText.Text = title;
             SongCreditsText.Text = string.IsNullOrWhiteSpace(finalArtist)
@@ -272,6 +276,7 @@ public partial class MainWindow : Window
         {
             // 오류 문구는 가수 이름 영역에 넣지 않고 별도의 안내 영역에 표시합니다.
             SearchWebView.Visibility = Visibility.Collapsed;
+            SearchWebView.Opacity = 0;
             EmptyScorePanel.Visibility = Visibility.Visible;
             NoticeTitleText.Text = "악보 검색 중 문제가 발생했습니다.";
             NoticeReasonText.Text = "네이버 검색 결과를 확인하는 중 문제가 발생했습니다. 잠시 후 다시 검색해 주세요.";
