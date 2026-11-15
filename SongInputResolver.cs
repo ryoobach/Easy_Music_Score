@@ -15,6 +15,17 @@ internal static class SongInputResolver
 {
     private static readonly HttpClient Http = new() { Timeout = Timeout.InfiniteTimeSpan };
 
+    // AI 제작 서비스명, 일반적인 AI 제작 문구, 독립 표기 AI를 폭넓게 확인합니다.
+    // MP3의 태그 정보는 사용하지 않고 파일명만 판별 기준으로 사용합니다.
+    private static readonly Regex[] AiNamePatterns =
+    {
+        new Regex(@"(?<![\p{L}\p{N}])(?:suno(?:\s*ai)?|udio|aiva|soundraw|boomy|loudly|mubert|beatoven(?:\.ai)?|stable[\s._-]*audio|musicgen|riffusion| ಹಾಡio|udioai| Donna[\s._-]*AI)(?![\p{L}\p{N}])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new Regex(@"(?<![\p{L}\p{N}])(?:AI[\s._-]*(?:song|music|track|generated|generation|created|composition|composer)|(?:song|music|track)[\s._-]*AI)(?![\p{L}\p{N}])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new Regex(@"(?:인공지능|AI)\s*(?:로\s*)?(?:생성|제작|작곡|만든|음악|곡)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new Regex(@"(?<![\p{L}\p{N}])AI(?![\p{L}\p{N}])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+        new Regex(@"(?:생성형\s*음악|AI\s*보컬|AI\s*커버|AI\s*작곡)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+    };
+
     public static async Task<ResolvedSongInput> ResolveAsync(string input)
     {
         if (Uri.TryCreate(input, UriKind.Absolute, out var uri) &&
@@ -32,34 +43,41 @@ internal static class SongInputResolver
 
         if (File.Exists(input) && string.Equals(Path.GetExtension(input), ".mp3", StringComparison.OrdinalIgnoreCase))
         {
-            try
-            {
-                using var taggedFile = TagLib.File.Create(input);
-                var taggedTitle = taggedFile.Tag.Title?.Trim() ?? "";
-                var taggedArtist = taggedFile.Tag.FirstPerformer?.Trim() ?? "";
-                var fallback = ParseTitleArtist(Path.GetFileNameWithoutExtension(input));
-                var title = string.IsNullOrWhiteSpace(taggedTitle) ? fallback.Title : taggedTitle;
-                var artist = string.IsNullOrWhiteSpace(taggedArtist) ? fallback.Artist : taggedArtist;
-                return new ResolvedSongInput(title, artist,
-                    LooksLikeAiSong(input + " " + taggedTitle + " " + taggedArtist),
-                    "MP3 파일명과 음악 정보를 확인했습니다.");
-            }
-            catch
-            {
-                var fallback = ParseTitleArtist(Path.GetFileNameWithoutExtension(input));
-                return new ResolvedSongInput(fallback.Title, fallback.Artist,
-                    LooksLikeAiSong(input), "MP3 파일의 태그를 읽지 못해 파일명에서 곡 정보를 추출했습니다.");
-            }
+            // 태그가 비어 있거나 사용자가 삭제한 경우에도 동일하게 작동하도록
+            // 곡 정보와 AI 여부를 파일명 하나에서만 판단합니다.
+            var fileName = Path.GetFileNameWithoutExtension(input);
+            var isAiSong = LooksLikeAiSong(fileName);
+            var cleanName = RemoveAiMarkers(fileName);
+            var parsed = ParseTitleArtist(cleanName);
+            return new ResolvedSongInput(parsed.Title, parsed.Artist, isAiSong,
+                "MP3 파일명에서 곡 정보를 확인했습니다.");
         }
 
         var looksLikePath = input.Contains('\\') || input.Contains('/') ||
                             input.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase);
         var text = looksLikePath ? Path.GetFileNameWithoutExtension(input) : input;
-        var result = ParseTitleArtist(text);
+        var result = ParseTitleArtist(RemoveAiMarkers(text));
         return new ResolvedSongInput(result.Title, result.Artist,
-            LooksLikeAiSong(input), looksLikePath
+            LooksLikeAiSong(text), looksLikePath
                 ? "파일 경로 또는 파일명에서 곡 정보를 추출했습니다."
                 : "입력한 곡 제목과 가수명을 검색어로 사용합니다.");
+    }
+
+    private static bool LooksLikeAiSong(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        return AiNamePatterns.Any(pattern => pattern.IsMatch(value));
+    }
+
+    private static string RemoveAiMarkers(string value)
+    {
+        var result = value ?? "";
+        foreach (var pattern in AiNamePatterns)
+            result = pattern.Replace(result, " ");
+        result = Regex.Replace(result, @"[\[\(\{]\s*[\]\)\}]", " ");
+        result = Regex.Replace(result, @"\s{2,}", " ");
+        result = Regex.Replace(result, @"^[\s\-_.()\[\]{}]+|[\s\-_.()\[\]{}]+$", "");
+        return result.Trim();
     }
 
     private static (string Title, string Artist) ParseTitleArtist(string value, bool artistFirst = false)
@@ -68,7 +86,7 @@ internal static class SongInputResolver
         text = Regex.Replace(text, @"^\s*\d{1,3}\s*[-._) ]+\s*", "");
         text = Regex.Replace(text, @"\.(mp3|wav|flac|m4a)$", "", RegexOptions.IgnoreCase).Trim();
 
-        var separators = new[] { " - ", " – ", " — ", "－" };
+        var separators = new[] { " - ", " – ", " — ", "－", "_" };
         foreach (var separator in separators)
         {
             var parts = text.Split(new[] { separator }, 2, StringSplitOptions.TrimEntries);
@@ -78,13 +96,6 @@ internal static class SongInputResolver
         return (text, "");
     }
 
-    private static bool LooksLikeAiSong(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return false;
-        return Regex.IsMatch(value,
-            @"(?i)(\bSuno\b|\bUdio\b|\bAI[ _-]?(song|music|generated)\b|AI\s*곡|인공지능\s*음악|AI로\s*생성)");
-    }
-
     private static async Task<string> ReadIcyTitleAsync(string streamUrl)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(18));
@@ -92,7 +103,7 @@ internal static class SongInputResolver
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, streamUrl);
             request.Headers.TryAddWithoutValidation("Icy-MetaData", "1");
-            request.Headers.TryAddWithoutValidation("User-Agent", "EasyMusicScore/1.10");
+            request.Headers.TryAddWithoutValidation("User-Agent", "EasyMusicScore/1.14");
             using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             response.EnsureSuccessStatusCode();
 
@@ -105,8 +116,6 @@ internal static class SongInputResolver
             await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
             var lengthByte = new byte[1];
             var declared = response.Content.Headers.ContentType?.CharSet?.Trim('"', '\'');
-            // Some stations send empty metadata blocks before the first song title.
-            // Keep reading ICY blocks until a title arrives or the timeout expires.
             while (!timeout.IsCancellationRequested)
             {
                 var audio = new byte[interval];
