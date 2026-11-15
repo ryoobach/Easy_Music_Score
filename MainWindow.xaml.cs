@@ -364,8 +364,7 @@ public partial class MainWindow : Window
             const normalizedText = normalize(text);
             const titleMatch = wanted.length > 0 && normalizedText.includes(wanted);
             const sheetMatch = /(악보|악보집|score|sheetmusic|musicsheet|기타코드|코드악보|피아노악보|반주악보)/i.test(text);
-            // 제목 정보가 이미지 카드에 누락된 경우도 있으므로 악보 관련 문구가 있는 후보는 보존합니다.
-            if (!titleMatch && !sheetMatch) continue;
+            // 네이버가 제목·악보 설명을 카드에 제공하지 않는 경우도 있어, 검색 결과의 큰 이미지 후보는 보존하고 점수로 구분합니다.
 
             const w = img.naturalWidth || img.width || Number(img.getAttribute('width')) || 0;
             const h = img.naturalHeight || img.height || Number(img.getAttribute('height')) || 0;
@@ -377,6 +376,7 @@ public partial class MainWindow : Window
             let score = Math.min(area / 10000, 100);
             if (titleMatch) score += 240;
             if (sheetMatch) score += 110;
+            if (!titleMatch && !sheetMatch) score -= 25;
             if (ratio >= 1.15 && ratio <= 2.8) score += 20;
             if (/(광고|배너|프로필|앨범|포스터|로고|상품|쇼핑)/i.test(text)) score -= 120;
             const artist = text.split(/[\r\n]+/).map(v => v.trim())
