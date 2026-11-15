@@ -334,10 +334,10 @@ public partial class MainWindow : Window
 
     private void CoreWebView2_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
     {
+        // 새 창을 Windows 기본 브라우저로 보내지 않고 현재 앱의 WebView에 연결합니다.
+        // Navigate()를 별도로 호출하는 대신 WebView2가 새 창 탐색을 직접 현재 화면에서 처리하게 합니다.
+        e.NewWindow = SearchWebView.CoreWebView2;
         e.Handled = true;
-        if (Uri.TryCreate(e.Uri, UriKind.Absolute, out var target) &&
-            (target.Scheme == Uri.UriSchemeHttp || target.Scheme == Uri.UriSchemeHttps))
-            SearchWebView.CoreWebView2.Navigate(target.ToString());
     }
 
     private void Print_Click(object sender, RoutedEventArgs e)
