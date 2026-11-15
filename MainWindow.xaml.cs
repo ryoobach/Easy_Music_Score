@@ -251,7 +251,7 @@ public partial class MainWindow : Window
           const wanted = normalize({titleJson});
           function normalize(value) {{
             return (value || '').normalize('NFKC').toLocaleLowerCase('ko-KR')
-              .replace(/[^\\p{{L}}\\p{{N}}]/gu, '');
+              .replace(/[^\p{{L}}\p{{N}}]/gu, '');
           }}
           const seen = new Set();
           const items = [];
@@ -261,7 +261,7 @@ public partial class MainWindow : Window
             if (!url || !/^https?:/i.test(url) || seen.has(url)) continue;
             const anchorText = img.closest('a')?.innerText || '';
             const labels = [img.alt || '', img.title || '', anchorText]
-              .flatMap(value => value.split(/[\\r\\n]+/))
+              .flatMap(value => value.split(/[\r\n]+/))
               .map(value => value.trim()).filter(Boolean);
             // 제목이 결과 제목/설명 한 줄과 완전히 일치하는 경우만 통과시킵니다.
             if (!labels.some(label => normalize(label) === wanted)) continue;
